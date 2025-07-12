@@ -56,19 +56,30 @@ class EmailMenu:
         print("📂 Email Categorization:")
         print("  1. Process all emails together")
         print("  2. Use intelligent NLP clustering (recommended)")
-        print("      • Automatically groups similar emails")
-        print("      • Creates categories like Marketing, Notifications, Work, etc.")
-        print("      • Generates separate reports per category")
+        print("      • TF-IDF vectorization + adaptive clustering")
+        print("      • Creates categories like Professional, GitHub, Shopping, etc.")
+        print("      • Fast and efficient processing")
+        print("  3. Use LLM-powered categorization (most accurate)")
+        print("      • Ollama LLM semantic analysis")
+        print("      • Context-aware intelligent categorization")
+        print("      • Slower but highest quality results")
         print()
         
-        categorize = self._get_choice("Select categorization method (1-2): ", ['1', '2'])
-        categorize_emails = categorize == '2'
+        categorize = self._get_choice("Select categorization method (1-3): ", ['1', '2', '3'])
+        categorize_emails = categorize in ['2', '3']
+        categorization_method = 'enhanced' if categorize == '2' else ('llm' if categorize == '3' else 'none')
         
         if categorize_emails:
-            print("\n✅ NLP-based email clustering enabled")
-            print("   🤖 Emails will be automatically grouped using machine learning")
-            print("   📊 Separate reports will be generated for each detected category")
-            print("   🏷️  Categories are determined by email content similarity")
+            if categorization_method == 'llm':
+                print("\n✅ LLM-powered categorization enabled")
+                print("   🧠 Emails will be analyzed using Ollama LLM for context-aware categorization")
+                print("   📊 Separate reports will be generated for each detected category")
+                print("   🎯 Categories are determined by semantic understanding and context")
+            else:
+                print("\n✅ NLP-based email clustering enabled") 
+                print("   🤖 Emails will be automatically grouped using machine learning")
+                print("   📊 Separate reports will be generated for each detected category")
+                print("   🏷️  Categories are determined by email content similarity")
         else:
             print("\n✅ Processing all emails together (no clustering)")
         
@@ -92,6 +103,7 @@ class EmailMenu:
         
         options = {
             'categorize_emails': categorize_emails,
+            'categorization_method': categorization_method,
             'voice_enabled': voice_enabled,
             'detailed_summaries': detailed_summaries
         }
@@ -99,11 +111,18 @@ class EmailMenu:
         print("\n" + "="*60)
         print("📋 PROCESSING CONFIGURATION SUMMARY")
         print("="*60)
-        print(f"📂 Email Clustering: {'NLP-based (ML)' if categorize_emails else 'Disabled (all together)'}")
+        if categorize_emails:
+            if categorization_method == 'llm':
+                print("📂 Email Clustering: LLM-powered (Ollama)")
+                print("🧠 AI Features: Semantic analysis + context understanding")
+            else:
+                print("📂 Email Clustering: NLP-based (ML)")
+                print("🤖 ML Features: TF-IDF vectorization + adaptive clustering")
+        else:
+            print("📂 Email Clustering: Disabled (all together)")
+        
         print(f"🎵 Voice Summaries: {'Enabled' if voice_enabled else 'Disabled'}")
         print(f"📝 Detail Level: {'Detailed' if detailed_summaries else 'Brief'}")
-        if categorize_emails:
-            print("🤖 ML Features: TF-IDF vectorization + K-means clustering")
         print("="*60)
         
         input("\nPress Enter to start processing...")

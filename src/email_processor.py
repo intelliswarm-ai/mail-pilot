@@ -6,6 +6,7 @@ from .ollama_client import OllamaClient
 from .email_categorizer import EmailCategorizer
 from .email_nlp_categorizer import EmailNLPCategorizer
 from .email_enhanced_categorizer import EmailEnhancedCategorizer
+from .email_llm_categorizer import EmailLLMCategorizer
 from tqdm import tqdm
 
 class EmailProcessor:
@@ -15,6 +16,7 @@ class EmailProcessor:
         self.categorizer = EmailCategorizer()  # Keep for fallback
         self.nlp_categorizer = EmailNLPCategorizer()  # Legacy categorizer
         self.enhanced_categorizer = EmailEnhancedCategorizer()  # Enhanced categorizer
+        self.llm_categorizer = EmailLLMCategorizer(ollama_client)  # LLM-powered categorizer
     
     def process_unread_emails(self, query: str = 'is:unread', options: Dict = None) -> Dict[str, Any]:
         logging.info("Starting email processing...")
@@ -42,13 +44,32 @@ class EmailProcessor:
         
         # Categorize emails if requested
         if options.get('categorize_emails', False):
-            # Use enhanced TF-IDF + adaptive clustering for better categorization
-            try:
-                clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
-                print("✅ Using Enhanced Categorizer (TF-IDF + Adaptive Clustering)")
-            except Exception as e:
-                print(f"⚠️  Enhanced categorizer failed ({e}), falling back to NLP categorizer")
-                clustered_emails = self.nlp_categorizer.categorize_emails(unread_emails)
+            categorization_method = options.get('categorization_method', 'enhanced')
+            
+            if categorization_method == 'llm':
+                # Use LLM-powered categorization for maximum accuracy
+                try:
+                    clustered_emails = self.llm_categorizer.categorize_emails(unread_emails)
+                    print("✅ Using LLM Categorizer (Ollama-powered)")
+                except Exception as e:
+                    print(f"⚠️  LLM categorizer failed ({e}), falling back to enhanced categorizer")
+                    clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
+            elif categorization_method == 'enhanced':
+                # Use enhanced TF-IDF + adaptive clustering
+                try:
+                    clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
+                    print("✅ Using Enhanced Categorizer (TF-IDF + Adaptive Clustering)")
+                except Exception as e:
+                    print(f"⚠️  Enhanced categorizer failed ({e}), falling back to NLP categorizer")
+                    clustered_emails = self.nlp_categorizer.categorize_emails(unread_emails)
+            else:
+                # Use basic NLP clustering (legacy)
+                try:
+                    clustered_emails = self.nlp_categorizer.categorize_emails(unread_emails)
+                    print("✅ Using Basic NLP Categorizer (TF-IDF + KMeans)")
+                except Exception as e:
+                    print(f"⚠️  All categorizers failed ({e}), using basic categorization")
+                    clustered_emails = self.categorizer.categorize_emails(unread_emails)
             
             # Process each cluster separately
             all_summaries = []
