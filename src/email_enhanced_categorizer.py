@@ -120,8 +120,9 @@ class EmailEnhancedCategorizer:
             emails, cluster_assignments, category_names
         )
         
-        # Step 7: Post-process to merge similar categories and add diagnostics
+        # Step 7: Post-process to merge similar categories and add uncategorized
         categorized_emails = self._post_process_categories(categorized_emails)
+        categorized_emails = self._add_uncategorized_category(categorized_emails, emails)
         
         # Step 8: Print results with diagnostics
         self._print_categorization_summary(categorized_emails)
@@ -288,7 +289,7 @@ class EmailEnhancedCategorizer:
         scaler = StandardScaler()
         features_scaled = scaler.fit_transform(features)
         
-        # Try DBSCAN with different eps values
+        # Try DBSCAN with different eps values - allow some outliers
         eps_values = [0.3, 0.5, 0.7, 1.0]
         for eps in eps_values:
             try:
@@ -298,8 +299,8 @@ class EmailEnhancedCategorizer:
                 n_clusters = len(set(assignments)) - (1 if -1 in assignments else 0)
                 n_noise = list(assignments).count(-1)
                 
-                # Skip if poor clustering
-                if n_clusters < 2 or n_noise > len(emails) * 0.4:
+                # Allow some outliers (up to 30%) but ensure reasonable clustering
+                if n_clusters < 2 or n_noise > len(emails) * 0.6:
                     continue
                 
                 # Calculate silhouette score
@@ -315,8 +316,9 @@ class EmailEnhancedCategorizer:
             except:
                 continue
         
-        # Try Agglomerative clustering
-        for n_clusters in range(2, min(10, n_samples // self.min_cluster_size + 1)):
+        # Try Agglomerative clustering with more conservative cluster counts
+        max_clusters = min(8, n_samples // (self.min_cluster_size * 2))  # More conservative
+        for n_clusters in range(2, max_clusters + 1):
             try:
                 clusterer = AgglomerativeClustering(
                     n_clusters=n_clusters,
@@ -326,6 +328,12 @@ class EmailEnhancedCategorizer:
                 
                 score = silhouette_score(features, assignments)
                 
+                # Penalize if any cluster is too large (> 40% of data)
+                cluster_sizes = [np.sum(assignments == i) for i in range(n_clusters)]
+                max_cluster_size = max(cluster_sizes)
+                if max_cluster_size > n_samples * 0.4:
+                    score *= 0.5  # Penalty for imbalanced clustering
+                
                 if score > best_score:
                     best_score = score
                     best_assignments = assignments
@@ -333,13 +341,20 @@ class EmailEnhancedCategorizer:
             except:
                 continue
         
-        # Try KMeans
-        for n_clusters in range(2, min(8, n_samples // self.min_cluster_size + 1)):
+        # Try KMeans with balance penalty
+        max_clusters_kmeans = min(6, n_samples // (self.min_cluster_size * 2))
+        for n_clusters in range(2, max_clusters_kmeans + 1):
             try:
                 clusterer = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
                 assignments = clusterer.fit_predict(features)
                 
                 score = silhouette_score(features, assignments)
+                
+                # Penalize if any cluster is too large (> 40% of data)
+                cluster_sizes = [np.sum(assignments == i) for i in range(n_clusters)]
+                max_cluster_size = max(cluster_sizes)
+                if max_cluster_size > n_samples * 0.4:
+                    score *= 0.5  # Penalty for imbalanced clustering
                 
                 if score > best_score:
                     best_score = score
@@ -515,11 +530,15 @@ class EmailEnhancedCategorizer:
                 
                 category_scores[category] = base_score
         
-        # Return best matching category
+        # Return best matching category with minimum threshold
         if category_scores:
-            best_category = max(category_scores.items(), key=lambda x: x[1])[0]
+            best_category, best_score = max(category_scores.items(), key=lambda x: x[1])
             cluster_size = len(cluster_emails)
-            return f"{best_category} ({cluster_size} emails)"
+            
+            # Require a minimum score to avoid weak matches
+            min_threshold = len(cluster_emails) * 0.1  # At least 10% of emails should match keywords
+            if best_score >= min_threshold:
+                return f"{best_category} ({cluster_size} emails)"
         
         return None
     
@@ -694,17 +713,18 @@ class EmailEnhancedCategorizer:
         return insights
     
     def _post_process_categories(self, categorized_emails: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
-        """Post-process categories to merge similar ones and improve naming"""
+        """Post-process categories to merge similar ones and add uncategorized"""
         processed_categories = {}
+        used_emails = set()  # Track which emails have been processed to avoid duplicates
         
-        # Merge similar categories
+        # Merge similar categories WITHOUT duplicating emails
         merge_patterns = {
             'GitHub Development': ['GitHub & Development', 'GitHub Development'],
             'Professional Development': ['LinkedIn Professional', 'Glassdoor Communications', 'Jobleads Communications'],
-            'Entertainment & Media': ['Amazon Services', 'Netflix Entertainment', 'Uber Communications']
+            'Entertainment & Media': ['Amazon Services', 'Netflix Entertainment']
         }
         
-        # Apply merging
+        # First pass: merge categories
         for target_category, source_patterns in merge_patterns.items():
             merged_emails = []
             
@@ -712,38 +732,91 @@ class EmailEnhancedCategorizer:
                 # Check if this category should be merged
                 should_merge = False
                 for pattern in source_patterns:
-                    if pattern in category_name or any(keyword in category_name.lower() 
-                                                     for keyword in pattern.lower().split()):
+                    if pattern in category_name:
                         should_merge = True
                         break
                 
                 if should_merge:
-                    merged_emails.extend(emails)
-                elif target_category not in processed_categories:
-                    # Keep original category if not merging
-                    processed_categories[category_name] = emails
+                    # Add emails that haven't been used yet
+                    for email in emails:
+                        email_id = email.get('id', f"{email.get('sender', '')}_{email.get('subject', '')}")
+                        if email_id not in used_emails:
+                            merged_emails.append(email)
+                            used_emails.add(email_id)
             
             if merged_emails:
                 processed_categories[f"{target_category} ({len(merged_emails)} emails)"] = merged_emails
         
-        # Add remaining categories that weren't merged
+        # Second pass: add remaining categories that weren't merged
         for category_name, emails in categorized_emails.items():
-            if not any(category_name in processed_categories or 
-                      any(pattern in category_name for patterns in merge_patterns.values() 
-                          for pattern in patterns)
-                      for patterns in merge_patterns.values()):
-                processed_categories[category_name] = emails
+            # Check if this category was merged
+            was_merged = False
+            for source_patterns in merge_patterns.values():
+                if any(pattern in category_name for pattern in source_patterns):
+                    was_merged = True
+                    break
+            
+            if not was_merged:
+                # Add emails that haven't been used yet
+                remaining_emails = []
+                for email in emails:
+                    email_id = email.get('id', f"{email.get('sender', '')}_{email.get('subject', '')}")
+                    if email_id not in used_emails:
+                        remaining_emails.append(email)
+                        used_emails.add(email_id)
+                
+                if remaining_emails:
+                    processed_categories[category_name] = remaining_emails
         
         return processed_categories
+    
+    def _add_uncategorized_category(self, categorized_emails: Dict[str, List[Dict]], all_emails: List[Dict]) -> Dict[str, List[Dict]]:
+        """Add uncategorized category for emails that don't fit well in any category"""
+        # Get all categorized email IDs
+        categorized_ids = set()
+        for emails in categorized_emails.values():
+            for email in emails:
+                email_id = email.get('id', f"{email.get('sender', '')}_{email.get('subject', '')}")
+                categorized_ids.add(email_id)
+        
+        # Find uncategorized emails
+        uncategorized_emails = []
+        for email in all_emails:
+            email_id = email.get('id', f"{email.get('sender', '')}_{email.get('subject', '')}")
+            if email_id not in categorized_ids:
+                email_copy = email.copy()
+                email_copy['category'] = 'Uncategorized'
+                email_copy['is_outlier'] = True
+                uncategorized_emails.append(email_copy)
+        
+        # Add uncategorized category if there are any
+        if uncategorized_emails:
+            categorized_emails[f"Uncategorized ({len(uncategorized_emails)} emails)"] = uncategorized_emails
+        
+        return categorized_emails
     
     def _print_categorization_diagnostics(self, categorized_emails: Dict[str, List[Dict]], all_emails: List[Dict]):
         """Print detailed diagnostics about categorization quality"""
         print(f"\n🔍 Categorization Diagnostics:")
         
-        total_categorized = sum(len(emails) for emails in categorized_emails.values())
-        coverage = (total_categorized / len(all_emails)) * 100
+        # Count unique emails (no duplicates)
+        unique_email_ids = set()
+        total_categorized = 0
         
+        for emails in categorized_emails.values():
+            for email in emails:
+                email_id = email.get('id', f"{email.get('sender', '')}_{email.get('subject', '')}")
+                if email_id not in unique_email_ids:
+                    unique_email_ids.add(email_id)
+                    total_categorized += 1
+        
+        coverage = (total_categorized / len(all_emails)) * 100
         print(f"   📊 Coverage: {total_categorized}/{len(all_emails)} emails ({coverage:.1f}%)")
+        
+        # Check for uncategorized emails
+        uncategorized_count = len(all_emails) - total_categorized
+        if uncategorized_count > 0:
+            print(f"   📋 Uncategorized: {uncategorized_count} emails")
         
         # Analyze category quality
         high_priority_categories = ['Professional Development', 'GitHub Development', 'Security & Authentication']
@@ -752,23 +825,27 @@ class EmailEnhancedCategorizer:
         for category_name, emails in categorized_emails.items():
             if any(priority in category_name for priority in high_priority_categories):
                 priority_email_count += len(emails)
-                print(f"   🎯 High Priority: {category_name} - {len(emails)} emails")
+                print(f"   🎯 High Priority: {category_name}")
         
         print(f"   ⚡ Total High Priority Emails: {priority_email_count}")
         
         # Check for potential issues
-        largest_category = max(categorized_emails.items(), key=lambda x: len(x[1]))
-        if len(largest_category[1]) > len(all_emails) * 0.5:
-            print(f"   ⚠️  WARNING: Largest category '{largest_category[0]}' contains {len(largest_category[1])} emails ({len(largest_category[1])/len(all_emails)*100:.1f}%)")
-            print(f"        This might indicate poor clustering - some emails may be miscategorized")
+        if categorized_emails:
+            largest_category = max(categorized_emails.items(), key=lambda x: len(x[1]))
+            largest_size = len(largest_category[1])
+            largest_percentage = (largest_size / len(all_emails)) * 100
             
-            # Sample some emails from the largest category for inspection
-            print(f"   🔍 Sample subjects from largest category:")
-            for i, email in enumerate(largest_category[1][:5]):
-                print(f"      {i+1}. {email.get('subject', 'No Subject')[:80]}...")
-        
-        # Category distribution analysis
-        sizes = [len(emails) for emails in categorized_emails.values()]
-        avg_size = np.mean(sizes)
-        print(f"   📈 Average category size: {avg_size:.1f} emails")
-        print(f"   📏 Size range: {min(sizes)} - {max(sizes)} emails")
+            if largest_percentage > 40:
+                print(f"   ⚠️  WARNING: Largest category '{largest_category[0]}' contains {largest_size} emails ({largest_percentage:.1f}%)")
+                print(f"        This might indicate poor clustering - some emails may be miscategorized")
+                
+                # Sample some emails from the largest category for inspection
+                print(f"   🔍 Sample subjects from largest category:")
+                for i, email in enumerate(largest_category[1][:5]):
+                    print(f"      {i+1}. {email.get('subject', 'No Subject')[:80]}...")
+            
+            # Category distribution analysis
+            sizes = [len(emails) for emails in categorized_emails.values()]
+            avg_size = np.mean(sizes)
+            print(f"   📈 Average category size: {avg_size:.1f} emails")
+            print(f"   📏 Size range: {min(sizes)} - {max(sizes)} emails")
