@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }} - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="text-center">
+            <div class="display-1 text-muted">{{ error_code }}</div>
+            <h2 class="mb-3">Oops! Something went wrong</h2>
+            <p class="lead">{{ error_message }}</p>
+            
+            <div class="mt-4">
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Go Home
+                </a>
+                <button class="btn btn-outline-secondary" onclick="history.back()">
+                    <i class="fas fa-arrow-left"></i> Go Back
+                </button>
+            </div>
+        </div>
+        
+        {% if error_code == 500 %}
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Troubleshooting Tips</h5>
+                <ul>
+                    <li>Check if Ollama service is running</li>
+                    <li>Verify your Gmail API credentials</li>
+                    <li>Ensure all required environment variables are set</li>
+                    <li>Try refreshing the page</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

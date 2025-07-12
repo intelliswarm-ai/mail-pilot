@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-tachometer-alt"></i> Mail Pilot Dashboard
+                </h4>
+                <span class="badge bg-light text-dark">{{ email_address }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="d-grid">
+                            <button class="btn btn-success btn-lg" id="process-emails" 
+                                    {% if processing_status.running %}disabled{% endif %}>
+                                <i class="fas fa-play"></i> 
+                                {% if processing_status.running %}
+                                    Processing...
+                                {% else %}
+                                    Process Emails Now
+                                {% endif %}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-grid">
+                            <button class="btn btn-outline-primary" id="refresh-status">
+                                <i class="fas fa-sync-alt"></i> Refresh Status
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="status-container">
+                    <!-- Status will be populated by JavaScript -->
+                </div>
+
+                <div id="progress-container" style="display: none;">
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 100%">
+                            Processing emails...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if processing_status.last_result %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history"></i> Last Processing Result
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="last-result">
+                    <!-- Last result will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog"></i> Quick Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Processing Status</label>
+                    <div id="status-indicator" class="badge bg-secondary">Unknown</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Last Run</label>
+                    <div id="last-run-time" class="small text-muted">Never</div>
+                </div>
+
+                <hr>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                        <i class="fas fa-refresh"></i> Refresh Page
+                    </button>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-question-circle"></i> How It Works
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li>Connects to your Gmail account</li>
+                    <li>Reads unread emails</li>
+                    <li>Processes with AI (Ollama)</li>
+                    <li>Generates summaries & action items</li>
+                    <li>Creates voice narration</li>
+                    <li>Sends summary email to you</li>
+                </ol>
+                
+                <div class="mt-3">
+                    <h6 class="small">Features</h6>
+                    <ul class="small list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Priority classification</li>
+                        <li><i class="fas fa-check text-success"></i> Action items extraction</li>
+                        <li><i class="fas fa-check text-success"></i> Voice summaries</li>
+                        <li><i class="fas fa-check text-success"></i> Privacy-first (local AI)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let statusCheckInterval;
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateStatus();
+    
+    // Set up auto-refresh every 5 seconds when processing
+    statusCheckInterval = setInterval(() => {
+        if (document.getElementById('process-emails').disabled) {
+            updateStatus();
+        }
+    }, 5000);
+});
+
+document.getElementById('process-emails').addEventListener('click', function() {
+    const button = this;
+    const progressContainer = document.getElementById('progress-container');
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+    progressContainer.style.display = 'block';
+    
+    fetch('/api/process-emails', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showAlert('danger', data.error);
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-play"></i> Process Emails Now';
+            progressContainer.style.display = 'none';
+        } else {
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            // Start polling for status updates
+            pollStatus();
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'Failed to start email processing');
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-play"></i> Process Emails Now';
+        progressContainer.style.display = 'none';
+    });
+});
+
+document.getElementById('refresh-status').addEventListener('click', updateStatus);
+
+function updateStatus() {
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            updateStatusDisplay(data);
+        })
+        .catch(error => {
+            console.error('Status update failed:', error);
+        });
+}
+
+function pollStatus() {
+    const pollInterval = setInterval(() => {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                updateStatusDisplay(data);
+                
+                if (!data.running) {
+                    clearInterval(pollInterval);
+                    const button = document.getElementById('process-emails');
+                    const progressContainer = document.getElementById('progress-container');
+                    
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-play"></i> Process Emails Now';
+                    progressContainer.style.display = 'none';
+                    
+                    if (data.last_result) {
+                        if (data.last_result.success) {
+                            showAlert('success', 'Email processing completed successfully!');
+                        } else {
+                            showAlert('danger', 'Email processing failed: ' + (data.error || 'Unknown error'));
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                clearInterval(pollInterval);
+                console.error('Status polling failed:', error);
+            });
+    }, 3000);
+}
+
+function updateStatusDisplay(status) {
+    const statusIndicator = document.getElementById('status-indicator');
+    const lastRunTime = document.getElementById('last-run-time');
+    const statusContainer = document.getElementById('status-container');
+    const lastResultDiv = document.getElementById('last-result');
+    
+    // Update status indicator
+    if (status.running) {
+        statusIndicator.className = 'badge bg-warning';
+        statusIndicator.textContent = 'Processing';
+    } else {
+        statusIndicator.className = 'badge bg-success';
+        statusIndicator.textContent = 'Ready';
+    }
+    
+    // Update last run time
+    if (status.last_run) {
+        const lastRun = new Date(status.last_run);
+        lastRunTime.textContent = lastRun.toLocaleString();
+    }
+    
+    // Update status container
+    if (status.running) {
+        statusContainer.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin"></i> Processing emails in progress...
+            </div>
+        `;
+    } else if (status.error) {
+        statusContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Error: ${status.error}
+            </div>
+        `;
+    } else {
+        statusContainer.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check"></i> Service ready. Click "Process Emails Now" to start.
+            </div>
+        `;
+    }
+    
+    // Update last result if exists
+    if (status.last_result && lastResultDiv) {
+        const result = status.last_result;
+        const timestamp = new Date(result.timestamp).toLocaleString();
+        
+        if (result.success) {
+            lastResultDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-primary">${result.total_emails || 0}</div>
+                            <small class="text-muted">Total Emails</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-danger">${result.high_priority || 0}</div>
+                            <small class="text-muted">High Priority</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-warning">${result.action_items || 0}</div>
+                            <small class="text-muted">Action Items</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-success"><i class="fas fa-check"></i></div>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <small class="text-muted">Processed at: ${timestamp}</small>
+            `;
+        } else {
+            lastResultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times"></i> Processing failed: ${result.error || 'Unknown error'}
+                    <br><small>At: ${timestamp}</small>
+                </div>
+            `;
+        }
+    }
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

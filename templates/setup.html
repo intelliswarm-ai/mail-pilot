@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Service Configuration - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-cog"></i> Configure Mail Pilot Service
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success" role="alert">
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Gmail Connected Successfully!</strong><br>
+                    Account: {{ email_address }}
+                </div>
+
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Email Configuration</h5>
+                            <div class="mb-3">
+                                <label for="email_password" class="form-label">
+                                    Gmail App Password <span class="text-danger">*</span>
+                                </label>
+                                <input type="password" class="form-control" id="email_password" name="email_password" required>
+                                <div class="form-text">Use the App Password you generated, not your Gmail password</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="smtp_server" class="form-label">SMTP Server</label>
+                                <input type="text" class="form-control" id="smtp_server" name="smtp_server" value="smtp.gmail.com">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="smtp_port" class="form-label">SMTP Port</label>
+                                <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="587">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h5>Ollama Configuration</h5>
+                            <div class="mb-3">
+                                <label for="ollama_url" class="form-label">Ollama URL</label>
+                                <div class="input-group">
+                                    <input type="url" class="form-control" id="ollama_url" name="ollama_url" value="http://localhost:11434">
+                                    <button class="btn btn-outline-secondary" type="button" id="test-ollama">
+                                        <i class="fas fa-plug"></i> Test
+                                    </button>
+                                </div>
+                                <div id="ollama-status" class="form-text"></div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="ollama_model" class="form-label">AI Model</label>
+                                <select class="form-select" id="ollama_model" name="ollama_model">
+                                    <option value="mistral">mistral (Recommended)</option>
+                                    <option value="llama2">llama2</option>
+                                    <option value="deepseek-r1">deepseek-r1</option>
+                                    <option value="deepseek-r1:32b">deepseek-r1:32b (Large)</option>
+                                    <option value="llava">llava</option>
+                                    <option value="llama3.2-vision">llama3.2-vision</option>
+                                </select>
+                            </div>
+
+                            <h5>Voice Settings</h5>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="voice_enabled" name="voice_enabled" checked>
+                                    <label class="form-check-label" for="voice_enabled">
+                                        Enable Voice Summaries
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="voice_language" class="form-label">Voice Language</label>
+                                <select class="form-select" id="voice_language" name="voice_language">
+                                    <option value="en">English</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="it">Italian</option>
+                                    <option value="pt">Portuguese</option>
+                                    <option value="ru">Russian</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="ko">Korean</option>
+                                    <option value="zh">Chinese</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Start Over
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="save-config">
+                            <i class="fas fa-save"></i> Save Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Configuration Notes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Security</h6>
+                        <ul class="small">
+                            <li>App passwords are safer than your main Gmail password</li>
+                            <li>All AI processing happens locally via Ollama</li>
+                            <li>Your configuration is stored in browser session only</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Voice Features</h6>
+                        <ul class="small">
+                            <li>Voice summaries are attached as MP3 files</li>
+                            <li>Generated using Google Text-to-Speech</li>
+                            <li>Can be disabled to save bandwidth</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('test-ollama').addEventListener('click', function() {
+    const button = this;
+    const status = document.getElementById('ollama-status');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    button.disabled = true;
+    
+    fetch('/api/test-ollama')
+        .then(response => response.json())
+        .then(data => {
+            if (data.connected) {
+                status.innerHTML = '<span class="text-success"><i class="fas fa-check"></i> Connected successfully!</span>';
+                status.className = 'form-text text-success';
+            } else {
+                status.innerHTML = '<span class="text-danger"><i class="fas fa-times"></i> Connection failed: ' + (data.error || 'Unknown error') + '</span>';
+                status.className = 'form-text text-danger';
+            }
+        })
+        .catch(error => {
+            status.innerHTML = '<span class="text-danger"><i class="fas fa-times"></i> Connection test failed</span>';
+            status.className = 'form-text text-danger';
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+});
+
+// Auto-test Ollama connection on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        document.getElementById('test-ollama').click();
+    }, 1000);
+});
+</script>
+{% endblock %}

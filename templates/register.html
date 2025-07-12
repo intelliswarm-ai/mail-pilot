@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Gmail Registration - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fab fa-google"></i> Connect Your Gmail Account
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Secure OAuth2 Authentication</strong><br>
+                    We use Google's official OAuth2 flow to securely access your Gmail. Your password is never stored.
+                </div>
+
+                <h5>Prerequisites</h5>
+                <div class="checklist mb-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check1">
+                        <label class="form-check-label" for="check1">
+                            Gmail account with 2-Factor Authentication enabled
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check2">
+                        <label class="form-check-label" for="check2">
+                            Gmail App Password generated (not your regular password)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check3">
+                        <label class="form-check-label" for="check3">
+                            Gmail API credentials.json file in parent directory (for privacy)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check4">
+                        <label class="form-check-label" for="check4">
+                            Ollama installed and running with a model (e.g., llama3.1)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <a href="{{ url_for('oauth_gmail') }}" class="btn btn-success btn-lg" id="oauth-btn">
+                        <i class="fab fa-google"></i> Authorize Gmail Access
+                    </a>
+                </div>
+
+                <div class="mt-4">
+                    <h6>What happens next?</h6>
+                    <ol class="small">
+                        <li>You'll be redirected to Google's authorization page</li>
+                        <li>Sign in with your Gmail account</li>
+                        <li>Grant Mail Pilot read access to your emails</li>
+                        <li>You'll be redirected back to configure the service</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Need Help Setting Up?</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="helpAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCredentials">
+                                Setting up Gmail API Credentials
+                            </button>
+                        </h2>
+                        <div id="collapseCredentials" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                                    <li>Create a new project or select existing one</li>
+                                    <li>Enable the Gmail API</li>
+                                    <li>Create OAuth 2.0 Client ID credentials</li>
+                                    <li>Download as <code>credentials.json</code> and place in parent directory (one folder above the project)</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAppPassword">
+                                Generating Gmail App Password
+                            </button>
+                        </h2>
+                        <div id="collapseAppPassword" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Go to <a href="https://myaccount.google.com/" target="_blank">Google Account Settings</a></li>
+                                    <li>Navigate to Security → 2-Step Verification</li>
+                                    <li>Scroll down to App passwords</li>
+                                    <li>Generate a new app password for "Mail"</li>
+                                    <li>Save this password - you'll need it in the next step</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOllama">
+                                Installing Ollama
+                            </button>
+                        </h2>
+                        <div id="collapseOllama" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Visit <a href="https://ollama.ai/" target="_blank">ollama.ai</a> and download for your OS</li>
+                                    <li>Install and start Ollama service</li>
+                                    <li>Pull a model: <code>ollama pull llama3.1</code></li>
+                                    <li>Verify it's running: <code>ollama list</code></li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.form-check-input');
+    const oauthBtn = document.getElementById('oauth-btn');
+    
+    function updateButtonState() {
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        oauthBtn.classList.toggle('btn-success', allChecked);
+        oauthBtn.classList.toggle('btn-secondary', !allChecked);
+        
+        if (allChecked) {
+            oauthBtn.innerHTML = '<i class="fab fa-google"></i> Authorize Gmail Access';
+        } else {
+            oauthBtn.innerHTML = '<i class="fas fa-clock"></i> Complete Prerequisites First';
+        }
+    }
+    
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateButtonState);
+    });
+    
+    updateButtonState();
+});
+</script>
+{% endblock %}

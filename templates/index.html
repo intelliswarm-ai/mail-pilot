@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Mail Pilot - AI Email Summary Service{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-envelope text-primary"></i> Mail Pilot
+            </h1>
+            <p class="lead">AI-powered email summary service that connects to your Gmail and sends you intelligent summaries with voice narration.</p>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Privacy First</h5>
+                        <p class="card-text">All AI processing happens locally with Ollama. Your emails never leave your control.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Smart Summaries</h5>
+                        <p class="card-text">AI extracts key information, action items, and priority levels from your emails.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-volume-up fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">Voice Summaries</h5>
+                        <p class="card-text">Get audio summaries delivered to your inbox for on-the-go listening.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body text-center">
+                <h4 class="card-title mb-3">Get Started</h4>
+                <p class="card-text mb-4">Connect your Gmail account and start receiving AI-powered email summaries.</p>
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
+                    <i class="fab fa-google"></i> Connect Gmail Account
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <h3>How It Works</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <ol class="list-group list-group-numbered">
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Connect Gmail</div>
+                                Securely authorize access to your Gmail account
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Configure Settings</div>
+                                Set up Ollama, email preferences, and voice options
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Manual or Scheduled</div>
+                                Run summaries on-demand or schedule automatic processing
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="col-md-6">
+                    <h5>Requirements</h5>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Gmail account with 2FA enabled</li>
+                        <li><i class="fas fa-check text-success"></i> Ollama installed and running locally</li>
+                        <li><i class="fas fa-check text-success"></i> Gmail App Password</li>
+                        <li><i class="fas fa-check text-success"></i> LLM model (e.g., llama3.1)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
