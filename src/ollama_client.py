@@ -11,41 +11,112 @@ class OllamaClient:
     
     def test_connection(self) -> bool:
         try:
+            logging.info(f"Testing connection to Ollama at {self.base_url}")
+            
+            # Test basic connection
             response = requests.get(f"{self.base_url}/api/tags", timeout=10)
-            return response.status_code == 200
+            if response.status_code != 200:
+                logging.error(f"Ollama server returned status {response.status_code}")
+                return False
+            
+            # Check if the model is available
+            models = response.json().get('models', [])
+            model_names = [model.get('name', '') for model in models]
+            
+            logging.info(f"Available models: {', '.join(model_names)}")
+            
+            if not any(self.model in name for name in model_names):
+                logging.error(f"Model '{self.model}' not found. Available models: {', '.join(model_names)}")
+                logging.error(f"Please run: ollama pull {self.model}")
+                return False
+            
+            # Test actual generation with a simple prompt
+            logging.info(f"Testing model '{self.model}' with simple prompt...")
+            test_response = self._test_generate()
+            
+            if test_response:
+                logging.info("✅ Ollama connection and model test successful")
+                return True
+            else:
+                logging.error("❌ Ollama model test failed")
+                return False
+                
+        except requests.exceptions.ConnectionError:
+            logging.error("❌ Cannot connect to Ollama server. Is Ollama running?")
+            logging.error("Try: ollama serve (if not already running)")
+            return False
+        except requests.exceptions.Timeout:
+            logging.error("❌ Connection to Ollama timed out")
+            return False
         except Exception as e:
-            logging.error(f"Failed to connect to Ollama: {e}")
+            logging.error(f"❌ Failed to connect to Ollama: {e}")
+            return False
+    
+    def _test_generate(self) -> bool:
+        """Test the model with a simple generation"""
+        try:
+            test_prompt = "Reply with just 'OK' to confirm you are working."
+            
+            payload = {
+                "model": self.model,
+                "prompt": test_prompt,
+                "stream": False
+            }
+            
+            # Show progress for the test
+            print(f"⏳ Testing {self.model} model response...")
+            
+            response = requests.post(
+                self.api_url,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json().get('response', '').strip()
+                logging.debug(f"Test response: {result}")
+                print(f"✅ Model test successful: {result[:50]}...")
+                return len(result) > 0
+            else:
+                logging.error(f"Test generation failed with status {response.status_code}")
+                print(f"❌ Model test failed: HTTP {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logging.error(f"Test generation error: {e}")
+            print(f"❌ Model test error: {e}")
             return False
     
     def summarize_email(self, email_data: Dict[str, Any]) -> Dict[str, str]:
-        prompt = f"""
-        Please analyze this email and provide:
-        1. A concise summary (2-3 sentences)
-        2. Any action items or tasks mentioned
-        3. Priority level (High/Medium/Low)
+        logging.info(f"Generating AI summary for email from {email_data['sender']}")
         
-        Email Details:
-        From: {email_data['sender']}
-        Subject: {email_data['subject']}
-        Date: {email_data['date']}
+        # Truncate email body for faster processing
+        body_preview = email_data['body'][:500] + "..." if len(email_data['body']) > 500 else email_data['body']
         
-        Content:
-        {email_data['body']}
-        
-        Format your response as JSON:
-        {{
-            "summary": "Brief summary here",
-            "action_items": ["action 1", "action 2"],
-            "priority": "High/Medium/Low",
-            "requires_response": true/false
-        }}
-        """
+        prompt = f"""Analyze this email and respond with JSON only:
+
+From: {email_data['sender']}
+Subject: {email_data['subject']}
+
+Content: {body_preview}
+
+Return JSON format:
+{{
+    "summary": "Brief 1-2 sentence summary",
+    "action_items": ["list any action items"],
+    "priority": "High/Medium/Low",
+    "requires_response": true/false
+}}"""
         
         try:
+            logging.debug(f"Sending email to Ollama for analysis (model: {self.model})")
             response = self._generate(prompt)
-            return self._parse_summary_response(response)
+            logging.debug(f"Received response from Ollama: {response[:100]}...")
+            parsed = self._parse_summary_response(response)
+            logging.info(f"Email summary completed - Priority: {parsed.get('priority', 'Unknown')}")
+            return parsed
         except Exception as e:
-            logging.error(f"Error summarizing email: {e}")
+            logging.error(f"Error summarizing email from {email_data['sender']}: {e}")
             return {
                 "summary": f"Error processing email from {email_data['sender']}",
                 "action_items": [],
@@ -54,9 +125,13 @@ class OllamaClient:
             }
     
     def generate_overall_summary(self, email_summaries: List[Dict[str, Any]]) -> str:
+        logging.info(f"Generating overall summary for {len(email_summaries)} emails")
+        
         high_priority = [e for e in email_summaries if e.get('priority') == 'High']
         medium_priority = [e for e in email_summaries if e.get('priority') == 'Medium']
         low_priority = [e for e in email_summaries if e.get('priority') == 'Low']
+        
+        logging.debug(f"Priority breakdown - High: {len(high_priority)}, Medium: {len(medium_priority)}, Low: {len(low_priority)}")
         
         prompt = f"""
         Create an executive summary of {len(email_summaries)} unread emails.
@@ -80,7 +155,10 @@ class OllamaClient:
         """
         
         try:
-            return self._generate(prompt)
+            logging.debug("Generating executive summary with Ollama")
+            summary = self._generate(prompt)
+            logging.info("Overall summary generation completed")
+            return summary
         except Exception as e:
             logging.error(f"Error generating overall summary: {e}")
             return f"Summary of {len(email_summaries)} emails processed with some errors."
@@ -95,7 +173,7 @@ class OllamaClient:
         response = requests.post(
             self.api_url,
             json=payload,
-            timeout=60
+            timeout=120  # Increased timeout to 2 minutes
         )
         
         if response.status_code == 200:

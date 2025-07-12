@@ -19,43 +19,102 @@ class GmailClient:
         self._authenticate()
     
     def _authenticate(self):
+        print("🔐 Starting Gmail authentication process...")
+        logging.info(f"Looking for credentials at: {self.credentials_path}")
+        logging.info(f"Looking for token at: {self.token_path}")
+        
         creds = None
         if os.path.exists(self.token_path):
+            print("🎫 Found existing authentication token, loading...")
+            logging.info("Loading existing authentication token")
             with open(self.token_path, 'rb') as token:
                 creds = pickle.load(token)
+        else:
+            print("🆕 No existing token found, will need fresh authentication")
+            logging.info("No existing token found")
         
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
+                print("🔄 Token expired, refreshing...")
+                logging.info("Refreshing expired token")
                 creds.refresh(Request())
+                print("✅ Token refreshed successfully")
             else:
+                print("🌐 Starting OAuth2 flow - browser will open...")
+                logging.info("Starting OAuth2 flow")
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self.credentials_path, SCOPES)
                 creds = flow.run_local_server(port=0)
+                print("✅ OAuth2 authentication completed")
             
+            print("💾 Saving authentication token for future use...")
             with open(self.token_path, 'wb') as token:
                 pickle.dump(creds, token)
+            logging.info("Authentication token saved")
+        else:
+            print("✅ Using valid existing authentication token")
         
+        print("🔗 Establishing Gmail API connection...")
         self.service = build('gmail', 'v1', credentials=creds)
-        logging.info("Gmail API authenticated successfully")
-    
-    def get_unread_messages(self) -> List[Dict[str, Any]]:
+        
+        # Get user profile to show which account is connected
         try:
+            profile = self.service.users().getProfile(userId='me').execute()
+            email_address = profile.get('emailAddress', 'Unknown')
+            total_messages = profile.get('messagesTotal', 'Unknown')
+            print(f"✅ Successfully connected to Gmail account: {email_address}")
+            print(f"📊 Account has {total_messages} total messages")
+            logging.info(f"Gmail API authenticated successfully for {email_address}")
+        except Exception as e:
+            print("✅ Gmail API connection established (profile info unavailable)")
+            logging.info("Gmail API authenticated successfully")
+    
+    def get_unread_messages(self, query: str = 'is:unread') -> List[Dict[str, Any]]:
+        try:
+            print("📧 Connecting to Gmail...")
+            logging.info(f"Fetching messages with query: {query}")
             results = self.service.users().messages().list(
-                userId='me', q='is:unread', maxResults=50
+                userId='me', q=query, maxResults=100
             ).execute()
             
             messages = results.get('messages', [])
+            print(f"📬 Found {len(messages)} unread messages")
+            logging.info(f"Found {len(messages)} unread messages to process")
             unread_emails = []
             
-            for message in messages:
-                msg = self.service.users().messages().get(
-                    userId='me', id=message['id'], format='full'
-                ).execute()
+            if len(messages) > 0:
+                print("📥 Downloading email content...")
+                from tqdm import tqdm
                 
-                email_data = self._parse_message(msg)
-                unread_emails.append(email_data)
+                # Progress bar for email downloading
+                progress_bar = tqdm(
+                    messages, 
+                    desc="📥 Downloading", 
+                    unit="email",
+                    bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} emails [{elapsed}<{remaining}]'
+                )
+                
+                for message in progress_bar:
+                    msg = self.service.users().messages().get(
+                        userId='me', id=message['id'], format='full'
+                    ).execute()
+                    
+                    email_data = self._parse_message(msg)
+                    sender_short = email_data['sender'].split('@')[0][:20]
+                    subject_short = email_data['subject'][:30] + "..." if len(email_data['subject']) > 30 else email_data['subject']
+                    
+                    progress_bar.set_description(f"📥 Downloaded: {sender_short}")
+                    progress_bar.set_postfix_str(f"'{subject_short}'")
+                    
+                    # Log detailed info about each email
+                    logging.info(f"Downloaded email: '{email_data['subject']}' from {email_data['sender']} ({email_data['date']})")
+                    
+                    unread_emails.append(email_data)
+                
+                progress_bar.close()
+                print("✅ All emails downloaded successfully")
             
-            logging.info(f"Retrieved {len(unread_emails)} unread messages")
+            logging.info(f"Successfully retrieved {len(unread_emails)} unread messages")
             return unread_emails
             
         except Exception as e:
@@ -97,7 +156,7 @@ class GmailClient:
                     payload['body']['data']
                 ).decode('utf-8')
         
-        return body[:2000]  # Limit body length
+        return body[:1000]  # Reduced body length for faster processing
     
     def mark_as_read(self, message_id: str):
         try:

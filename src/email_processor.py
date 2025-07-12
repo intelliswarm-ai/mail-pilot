@@ -3,61 +3,79 @@ from typing import List, Dict, Any
 from datetime import datetime
 from .gmail_client import GmailClient
 from .ollama_client import OllamaClient
+from .email_categorizer import EmailCategorizer
+from tqdm import tqdm
 
 class EmailProcessor:
     def __init__(self, gmail_client: GmailClient, ollama_client: OllamaClient):
         self.gmail_client = gmail_client
         self.ollama_client = ollama_client
+        self.categorizer = EmailCategorizer()
     
-    def process_unread_emails(self) -> Dict[str, Any]:
+    def process_unread_emails(self, query: str = 'is:unread', options: Dict = None) -> Dict[str, Any]:
         logging.info("Starting email processing...")
         
-        # Get unread emails
-        unread_emails = self.gmail_client.get_unread_messages()
+        if options is None:
+            options = {'categorize_emails': False, 'detailed_summaries': False}
+        
+        # Get emails based on query
+        unread_emails = self.gmail_client.get_unread_messages(query)
         
         if not unread_emails:
-            logging.info("No unread emails found")
+            logging.info("No emails found")
             return {
                 'total_emails': 0,
                 'email_summaries': [],
-                'overall_summary': 'No unread emails at this time.',
+                'overall_summary': 'No emails found for the selected timeframe.',
                 'high_priority_count': 0,
-                'action_items_total': 0
+                'action_items_total': 0,
+                'commercial_emails': [],
+                'personal_emails': [],
+                'categorization_enabled': False
             }
         
-        logging.info(f"Processing {len(unread_emails)} unread emails")
+        logging.info(f"Processing {len(unread_emails)} emails with AI analysis")
         
-        # Process each email through Ollama
-        email_summaries = []
-        for email_data in unread_emails:
-            try:
-                summary = self.ollama_client.summarize_email(email_data)
-                email_summaries.append({
-                    'email_id': email_data['id'],
-                    'sender': email_data['sender'],
-                    'subject': email_data['subject'],
-                    'date': email_data['date'],
-                    'summary': summary['summary'],
-                    'action_items': summary['action_items'],
-                    'priority': summary['priority'],
-                    'requires_response': summary['requires_response']
-                })
-                logging.info(f"Processed email from {email_data['sender']}")
-            except Exception as e:
-                logging.error(f"Error processing email from {email_data['sender']}: {e}")
-                email_summaries.append({
-                    'email_id': email_data['id'],
-                    'sender': email_data['sender'],
-                    'subject': email_data['subject'],
-                    'date': email_data['date'],
-                    'summary': 'Error processing this email',
-                    'action_items': [],
-                    'priority': 'Medium',
-                    'requires_response': False
-                })
+        # Categorize emails if requested
+        if options.get('categorize_emails', False):
+            commercial_emails, personal_emails = self.categorizer.categorize_emails(unread_emails)
+            
+            # Process commercial and personal emails separately
+            commercial_summaries = self._process_email_batch(commercial_emails, "Commercial", options)
+            personal_summaries = self._process_email_batch(personal_emails, "Personal", options)
+            
+            # Combine results
+            email_summaries = commercial_summaries + personal_summaries
+            
+            # Generate separate overall summaries
+            commercial_overall = self.ollama_client.generate_overall_summary(commercial_summaries) if commercial_summaries else "No commercial emails."
+            personal_overall = self.ollama_client.generate_overall_summary(personal_summaries) if personal_summaries else "No personal emails."
+            
+            overall_summary = f"COMMERCIAL EMAILS:\n{commercial_overall}\n\nPERSONAL EMAILS:\n{personal_overall}"
+            
+        else:
+            # Process all emails together
+            email_summaries = self._process_email_batch(unread_emails, "All", options)
+            commercial_emails, personal_emails = [], []
+            overall_summary = self.ollama_client.generate_overall_summary(email_summaries)
         
-        # Generate overall summary
-        overall_summary = self.ollama_client.generate_overall_summary(email_summaries)
+        # Print final processing summary
+        print(f"\n📊 Final Email Processing Summary:")
+        high_priority = len([e for e in email_summaries if e['priority'] == 'High'])
+        medium_priority = len([e for e in email_summaries if e['priority'] == 'Medium'])
+        low_priority = len([e for e in email_summaries if e['priority'] == 'Low'])
+        total_actions = sum(len(e['action_items']) for e in email_summaries)
+        need_response = len([e for e in email_summaries if e['requires_response']])
+        
+        if options.get('categorize_emails', False):
+            print(f"   🏢 Commercial Emails: {len(commercial_emails)}")
+            print(f"   👤 Personal Emails: {len(personal_emails)}")
+        
+        print(f"   📈 High Priority: {high_priority} emails")
+        print(f"   📊 Medium Priority: {medium_priority} emails")
+        print(f"   📉 Low Priority: {low_priority} emails")
+        print(f"   ⚡ Total Action Items: {total_actions}")
+        print(f"   ⚠️  Need Response: {need_response} emails")
         
         # Calculate statistics
         high_priority_count = len([e for e in email_summaries if e['priority'] == 'High'])
@@ -69,11 +87,118 @@ class EmailProcessor:
             'overall_summary': overall_summary,
             'high_priority_count': high_priority_count,
             'action_items_total': action_items_total,
-            'processed_at': datetime.now().isoformat()
+            'processed_at': datetime.now().isoformat(),
+            'commercial_emails': commercial_emails,
+            'personal_emails': personal_emails,
+            'categorization_enabled': options.get('categorize_emails', False)
         }
         
         logging.info(f"Email processing completed. {len(email_summaries)} emails processed")
         return result
+    
+    def _process_email_batch(self, emails: List[Dict], category: str, options: Dict) -> List[Dict]:
+        """Process a batch of emails (commercial, personal, or all)"""
+        if not emails:
+            return []
+        
+        email_summaries = []
+        
+        print(f"\n🔄 Processing {category} Emails ({len(emails)} emails)")
+        
+        # Create progress bar
+        progress_bar = tqdm(
+            emails, 
+            desc=f"🤖 AI Processing {category}", 
+            unit="email",
+            bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} emails [{elapsed}<{remaining}, {rate_fmt}]'
+        )
+        
+        for i, email_data in enumerate(progress_bar, 1):
+            try:
+                # Detailed email info
+                sender_short = email_data['sender'].split('@')[0][:20]
+                subject_short = email_data['subject'][:25] + "..." if len(email_data['subject']) > 25 else email_data['subject']
+                
+                # Update progress bar with current email details
+                progress_bar.set_description(f"🤖 {category} ({i}/{len(emails)})")
+                progress_bar.set_postfix_str(f"{sender_short}: '{subject_short}'")
+                
+                # Print detailed processing info
+                print(f"\n📧 Processing {category} Email {i}/{len(emails)}:")
+                print(f"   📤 From: {email_data['sender']}")
+                print(f"   📝 Subject: {email_data['subject']}")
+                print(f"   📅 Date: {email_data['date']}")
+                print(f"   📏 Content length: {len(email_data['body'])} characters")
+                print(f"   🤖 Sending to {self.ollama_client.model} for analysis...")
+                
+                summary = self.ollama_client.summarize_email(email_data)
+                
+                # Print AI analysis results
+                print(f"   ✅ AI Analysis Complete:")
+                print(f"      🏷️  Priority: {summary['priority']}")
+                print(f"      📋 Summary: {summary['summary'][:100]}{'...' if len(summary['summary']) > 100 else ''}")
+                if summary['action_items']:
+                    print(f"      ⚡ Action Items: {len(summary['action_items'])} found")
+                    for j, item in enumerate(summary['action_items'][:2], 1):  # Show first 2
+                        print(f"         {j}. {item}")
+                    if len(summary['action_items']) > 2:
+                        print(f"         ... and {len(summary['action_items'])-2} more")
+                else:
+                    print(f"      ⚡ Action Items: None")
+                
+                if summary['requires_response']:
+                    print(f"      ⚠️  Requires Response: YES")
+                
+                email_summaries.append({
+                    'email_id': email_data['id'],
+                    'sender': email_data['sender'],
+                    'subject': email_data['subject'],
+                    'date': email_data['date'],
+                    'summary': summary['summary'],
+                    'action_items': summary['action_items'],
+                    'priority': summary['priority'],
+                    'requires_response': summary['requires_response'],
+                    'category': category.lower()  # Add category to each email
+                })
+                
+                # Update progress bar with completion status
+                progress_bar.set_postfix(status=f"✅ {summary['priority']}")
+                
+            except Exception as e:
+                print(f"   ❌ Error processing email: {e}")
+                logging.error(f"Error processing email from {email_data['sender']}: {e}")
+                email_summaries.append({
+                    'email_id': email_data['id'],
+                    'sender': email_data['sender'],
+                    'subject': email_data['subject'],
+                    'date': email_data['date'],
+                    'summary': 'Error processing this email',
+                    'action_items': [],
+                    'priority': 'Medium',
+                    'requires_response': False,
+                    'category': category.lower()
+                })
+                progress_bar.set_postfix(status="❌ Error")
+        
+        # Close progress bar
+        progress_bar.close()
+        
+        # Print batch summary
+        if emails:
+            high_priority = len([e for e in email_summaries if e['priority'] == 'High'])
+            medium_priority = len([e for e in email_summaries if e['priority'] == 'Medium'])
+            low_priority = len([e for e in email_summaries if e['priority'] == 'Low'])
+            total_actions = sum(len(e['action_items']) for e in email_summaries)
+            need_response = len([e for e in email_summaries if e['requires_response']])
+            
+            print(f"\n📊 {category} Email Summary:")
+            print(f"   📈 High Priority: {high_priority} emails")
+            print(f"   📊 Medium Priority: {medium_priority} emails")
+            print(f"   📉 Low Priority: {low_priority} emails")
+            print(f"   ⚡ Action Items: {total_actions}")
+            print(f"   ⚠️  Need Response: {need_response} emails")
+        
+        return email_summaries
     
     def format_email_summary_text(self, processing_result: Dict[str, Any]) -> str:
         email_summaries = processing_result['email_summaries']

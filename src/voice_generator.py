@@ -15,8 +15,10 @@ class VoiceGenerator:
             return None
         
         try:
+            logging.info("Generating voice summary with text-to-speech")
             # Clean the text for speech
             clean_text = self._clean_text_for_speech(summary_text)
+            logging.debug(f"Cleaned text length: {len(clean_text)} characters")
             
             # Create TTS object
             tts = gTTS(text=clean_text, lang=self.language, slow=False)
@@ -31,8 +33,10 @@ class VoiceGenerator:
                 output_path = temp_file.name
                 temp_file.close()
             
-            # Save the audio file
+            # Save the audio file with progress indication
+            print("🎵 Generating voice file...")
             tts.save(output_path)
+            print("✅ Voice file generated successfully")
             
             logging.info(f"Voice summary generated: {output_path}")
             return output_path

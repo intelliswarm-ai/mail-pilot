@@ -16,6 +16,7 @@ class OllamaConfig:
 
 @dataclass
 class EmailConfig:
+    enabled: bool
     smtp_server: str
     smtp_port: int
     email_address: str
@@ -68,11 +69,13 @@ class ConfigManager:
         )
         
         # Email configuration
+        email_enabled = self._get_env('EMAIL_SENDING_ENABLED', 'false').lower() == 'true'
         email_config = EmailConfig(
+            enabled=email_enabled,
             smtp_server=self._get_env('SMTP_SERVER', 'smtp.gmail.com'),
             smtp_port=int(self._get_env('SMTP_PORT', '587')),
-            email_address=self._get_required_env('EMAIL_ADDRESS'),
-            email_password=self._get_required_env('EMAIL_PASSWORD')
+            email_address=self._get_env('EMAIL_ADDRESS', '') if email_enabled else '',
+            email_password=self._get_env('EMAIL_PASSWORD', '') if email_enabled else ''
         )
         
         # Scheduler configuration
@@ -92,7 +95,7 @@ class ConfigManager:
             email=email_config,
             scheduler=scheduler_config,
             voice=voice_config,
-            log_level=self._get_env('LOG_LEVEL', 'INFO')
+            log_level=self._get_env('LOG_LEVEL', 'DEBUG')
         )
     
     def _get_env(self, key: str, default: str = None) -> str:
@@ -113,20 +116,26 @@ class ConfigManager:
         """Validate configuration values"""
         errors = []
         
-        # Validate Gmail config
-        if not os.path.exists(config.gmail.credentials_path):
-            errors.append(f"Gmail credentials file not found: {config.gmail.credentials_path}")
+        # Validate Gmail config - handle relative paths properly
+        credentials_path = config.gmail.credentials_path
+        if not os.path.isabs(credentials_path):
+            # For relative paths, resolve from the current working directory
+            credentials_path = os.path.abspath(credentials_path)
+        
+        if not os.path.exists(credentials_path):
+            errors.append(f"Gmail credentials file not found: {config.gmail.credentials_path} (resolved to: {credentials_path})")
         
         # Validate scheduler interval
         if config.scheduler.interval_hours < 1 or config.scheduler.interval_hours > 24:
             errors.append("Scheduler interval must be between 1 and 24 hours")
         
-        # Validate email config
-        if not config.email.email_address or '@' not in config.email.email_address:
-            errors.append("Invalid email address")
-        
-        if not config.email.email_password:
-            errors.append("Email password is required")
+        # Validate email config (only if email sending is enabled)
+        if config.email.enabled:
+            if not config.email.email_address or '@' not in config.email.email_address:
+                errors.append("Invalid email address (required when EMAIL_SENDING_ENABLED=true)")
+            
+            if not config.email.email_password:
+                errors.append("Email password is required (required when EMAIL_SENDING_ENABLED=true)")
         
         # Validate voice language
         valid_languages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh']

@@ -82,6 +82,9 @@ uploads/
 *.wav
 audio_temp/
 
+# Local summary files
+summaries/
+
 # Backup files
 *.bak
 *.backup
