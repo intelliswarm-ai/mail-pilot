@@ -43,13 +43,17 @@ class EmailLLMCategorizer:
         
         Returns: Dictionary with category names as keys and email lists as values
         """
+        import time
+        
         if not emails:
             return {"General": []}
         
+        start_time = time.time()
         print(f"\n🤖 Starting LLM-powered email categorization for {len(emails)} emails...")
         print(f"   🧠 Using {self.ollama_client.model} for intelligent analysis")
+        print(f"   ⏱️  Estimated time: {len(emails) // self.batch_size * 35:.0f} seconds")
         
-        # Step 1: Analyze emails in batches for efficiency
+        # Step 1: Analyze emails in batches for efficiency with progress saving
         email_analyses = self._analyze_emails_in_batches(emails)
         
         # Step 2: Group emails by LLM-suggested categories
@@ -62,16 +66,22 @@ class EmailLLMCategorizer:
         categorized_emails = self._handle_uncategorized(categorized_emails, emails)
         
         # Step 5: Print results with insights
+        elapsed_time = time.time() - start_time
+        print(f"\n⏱️  Total processing time: {elapsed_time:.1f} seconds ({elapsed_time/60:.1f} minutes)")
+        
         self._print_llm_categorization_summary(categorized_emails)
         self._print_llm_insights(categorized_emails, emails)
         
         return categorized_emails
     
     def _analyze_emails_in_batches(self, emails: List[Dict]) -> List[Dict]:
-        """Analyze emails in batches using LLM for efficiency"""
+        """Analyze emails in batches using LLM for efficiency with progress saving"""
+        import time
+        
         print(f"📊 Analyzing emails in batches of {self.batch_size}...")
         
         all_analyses = []
+        failed_batches = []
         
         # Process emails in batches
         for i in range(0, len(emails), self.batch_size):
@@ -81,22 +91,50 @@ class EmailLLMCategorizer:
             
             print(f"🔄 Processing batch {batch_num}/{total_batches} ({len(batch)} emails)...")
             
-            try:
-                batch_analysis = self._analyze_email_batch(batch)
-                all_analyses.extend(batch_analysis)
-            except Exception as e:
-                print(f"⚠️  Error analyzing batch {batch_num}: {e}")
+            # Try up to 2 times for each batch with escalating timeouts
+            success = False
+            timeout_multiplier = 1
+            
+            for attempt in range(2):
+                try:
+                    if attempt > 0:
+                        print(f"   🔄 Retry attempt {attempt + 1}/2 with {timeout_multiplier}x timeout...")
+                    
+                    batch_analysis = self._analyze_email_batch(batch, timeout_multiplier)
+                    all_analyses.extend(batch_analysis)
+                    success = True
+                    break
+                    
+                except TimeoutError as e:
+                    print(f"   ⏰ Timeout on attempt {attempt + 1}: {str(e)[:100]}...")
+                    timeout_multiplier = 5  # 5x timeout for next attempt
+                    if attempt == 0:
+                        time.sleep(3)  # Brief pause before retry
+                except Exception as e:
+                    print(f"   ❌ Attempt {attempt + 1} failed: {str(e)[:100]}...")
+                    if attempt == 0:
+                        time.sleep(2)  # Brief pause before retry
+            
+            if not success:
+                print(f"   ⚠️  Batch {batch_num} failed after retries, using fallback")
+                failed_batches.append(batch_num)
                 # Fallback: assign to general category
                 for email in batch:
                     all_analyses.append({
                         'category': 'General',
                         'confidence': 0.3,
-                        'reasoning': 'LLM analysis failed, using fallback categorization'
+                        'reasoning': 'LLM analysis failed after retries'
                     })
+        
+        if failed_batches:
+            print(f"⚠️  Failed batches: {failed_batches} (used fallback categorization)")
+            print(f"📊 Success rate: {((total_batches - len(failed_batches)) / total_batches * 100):.1f}%")
+        else:
+            print(f"✅ All batches processed successfully!")
         
         return all_analyses
     
-    def _analyze_email_batch(self, emails: List[Dict]) -> List[Dict]:
+    def _analyze_email_batch(self, emails: List[Dict], timeout_multiplier: int = 1) -> List[Dict]:
         """Analyze a batch of emails using LLM"""
         
         # Prepare email summaries for LLM analysis (shorter format)
@@ -118,17 +156,17 @@ Categories: {categories_list}
 Emails:
 {chr(10).join(email_summaries)}
 
-Return ONLY JSON array:
+Return valid JSON array with email_index, category, and confidence:
 [
   {{"email_index": 1, "category": "Professional Development", "confidence": 0.9}},
-  {{"email_index": 2, "category": "Shopping & E-commerce", "confidence": 0.8}},
-  {{"email_index": 3, "category": "Development & Technology", "confidence": 0.7}}
+  {{"email_index": 2, "category": "Shopping & E-commerce", "confidence": 0.8}}
 ]
-"""
+
+Important: Use email_index (not email\\_index), valid JSON format, no trailing commas."""
         
         try:
-            # Get LLM response
-            response = self._call_llm(prompt)
+            # Get LLM response with dynamic timeout
+            response = self._call_llm(prompt, timeout_multiplier)
             
             print(f"   📝 LLM response preview: {response[:100]}...")
             
@@ -152,21 +190,40 @@ Return ONLY JSON array:
             formatted.append(f"- {category}: {description}")
         return "\n".join(formatted)
     
-    def _call_llm(self, prompt: str) -> str:
-        """Call the LLM with error handling and timeout"""
+    def _call_llm(self, prompt: str, timeout_multiplier: int = 1) -> str:
+        """Call the LLM with error handling and dynamic timeout"""
         import time
+        import requests
         
         try:
-            print("   ⏳ Sending request to LLM...")
+            print(f"   ⏳ Sending request to LLM (timeout: {120 * timeout_multiplier}s)...")
             start_time = time.time()
             
-            # Use the existing ollama client's _generate method
-            response = self.ollama_client._generate(prompt)
+            # Use custom timeout instead of the hardcoded one
+            payload = {
+                "model": self.ollama_client.model,
+                "prompt": prompt,
+                "stream": False
+            }
             
+            response = requests.post(
+                self.ollama_client.api_url,
+                json=payload,
+                timeout=120 * timeout_multiplier  # Dynamic timeout scaling
+            )
+            
+            if response.status_code == 200:
+                result = response.json().get('response', '')
+                elapsed_time = time.time() - start_time
+                print(f"   ✅ LLM response received ({elapsed_time:.1f}s)")
+                return result
+            else:
+                raise Exception(f"Ollama API error: {response.status_code}")
+            
+        except requests.exceptions.Timeout as e:
             elapsed_time = time.time() - start_time
-            print(f"   ✅ LLM response received ({elapsed_time:.1f}s)")
-            
-            return response
+            print(f"   ⏰ Timeout after {elapsed_time:.1f}s (will retry with {timeout_multiplier * 5}x timeout)")
+            raise TimeoutError(f"LLM request timed out after {elapsed_time:.1f}s")
         except Exception as e:
             logging.error(f"LLM call failed: {e}")
             raise
@@ -180,6 +237,12 @@ Return ONLY JSON array:
                 json_str = json_match.group(0)
             else:
                 json_str = response.strip()
+            
+            # Fix common LLM JSON issues
+            json_str = json_str.replace('email\\_index', 'email_index')  # Fix escaped underscores
+            json_str = json_str.replace('\\_', '_')  # Fix any other escaped underscores
+            json_str = re.sub(r',\s*}', '}', json_str)  # Remove trailing commas
+            json_str = re.sub(r',\s*]', ']', json_str)  # Remove trailing commas in arrays
             
             # Parse JSON
             analyses = json.loads(json_str)
@@ -265,12 +328,12 @@ Return ONLY JSON array:
         for email, analysis in zip(emails, analyses):
             category = analysis['category']
             
-            # Add analysis metadata to email
+            # Add analysis metadata to email (ensure JSON serializable)
             email_with_metadata = email.copy()
-            email_with_metadata['llm_category'] = category
-            email_with_metadata['llm_confidence'] = analysis['confidence']
-            email_with_metadata['llm_reasoning'] = analysis['reasoning']
-            email_with_metadata['category'] = category
+            email_with_metadata['llm_category'] = str(category)
+            email_with_metadata['llm_confidence'] = float(analysis['confidence'])
+            email_with_metadata['llm_reasoning'] = str(analysis.get('reasoning', 'LLM categorization'))
+            email_with_metadata['category'] = str(category)
             
             categorized_emails[category].append(email_with_metadata)
         

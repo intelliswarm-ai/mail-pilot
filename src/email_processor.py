@@ -7,6 +7,7 @@ from .email_categorizer import EmailCategorizer
 from .email_nlp_categorizer import EmailNLPCategorizer
 from .email_enhanced_categorizer import EmailEnhancedCategorizer
 from .email_llm_categorizer import EmailLLMCategorizer
+from .email_hybrid_categorizer import EmailHybridCategorizer
 from tqdm import tqdm
 
 class EmailProcessor:
@@ -17,6 +18,7 @@ class EmailProcessor:
         self.nlp_categorizer = EmailNLPCategorizer()  # Legacy categorizer
         self.enhanced_categorizer = EmailEnhancedCategorizer()  # Enhanced categorizer
         self.llm_categorizer = EmailLLMCategorizer(ollama_client)  # LLM-powered categorizer
+        self.hybrid_categorizer = EmailHybridCategorizer(self.enhanced_categorizer, ollama_client)  # Hybrid categorizer
     
     def process_unread_emails(self, query: str = 'is:unread', options: Dict = None) -> Dict[str, Any]:
         logging.info("Starting email processing...")
@@ -47,12 +49,12 @@ class EmailProcessor:
             categorization_method = options.get('categorization_method', 'enhanced')
             
             if categorization_method == 'llm':
-                # Use LLM-powered categorization for maximum accuracy
+                # Use hybrid categorization: fast clustering + LLM naming
                 try:
-                    clustered_emails = self.llm_categorizer.categorize_emails(unread_emails)
-                    print("✅ Using LLM Categorizer (Ollama-powered)")
+                    clustered_emails = self.hybrid_categorizer.categorize_emails(unread_emails)
+                    print("✅ Using Hybrid Categorizer (Enhanced Clustering + LLM Naming)")
                 except Exception as e:
-                    print(f"⚠️  LLM categorizer failed ({e}), falling back to enhanced categorizer")
+                    print(f"⚠️  Hybrid categorizer failed ({e}), falling back to enhanced categorizer")
                     clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
             elif categorization_method == 'enhanced':
                 # Use enhanced TF-IDF + adaptive clustering

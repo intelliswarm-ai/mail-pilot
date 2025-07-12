@@ -59,10 +59,10 @@ class EmailMenu:
         print("      • TF-IDF vectorization + adaptive clustering")
         print("      • Creates categories like Professional, GitHub, Shopping, etc.")
         print("      • Fast and efficient processing")
-        print("  3. Use LLM-powered categorization (most accurate)")
-        print("      • Ollama LLM semantic analysis")
-        print("      • Context-aware intelligent categorization")
-        print("      • Slower but highest quality results")
+        print("  3. Use hybrid categorization (best of both worlds)")
+        print("      • Fast clustering with Enhanced NLP")
+        print("      • Intelligent category naming with LLM")
+        print("      • Optimal balance of speed and accuracy")
         print()
         
         categorize = self._get_choice("Select categorization method (1-3): ", ['1', '2', '3'])
@@ -71,10 +71,10 @@ class EmailMenu:
         
         if categorize_emails:
             if categorization_method == 'llm':
-                print("\n✅ LLM-powered categorization enabled")
-                print("   🧠 Emails will be analyzed using Ollama LLM for context-aware categorization")
-                print("   📊 Separate reports will be generated for each detected category")
-                print("   🎯 Categories are determined by semantic understanding and context")
+                print("\n✅ Hybrid categorization enabled")
+                print("   📊 Fast clustering using Enhanced NLP algorithms")
+                print("   🧠 Intelligent category naming using Ollama LLM") 
+                print("   🚀 Optimal combination of speed and accuracy")
             else:
                 print("\n✅ NLP-based email clustering enabled") 
                 print("   🤖 Emails will be automatically grouped using machine learning")
@@ -113,8 +113,8 @@ class EmailMenu:
         print("="*60)
         if categorize_emails:
             if categorization_method == 'llm':
-                print("📂 Email Clustering: LLM-powered (Ollama)")
-                print("🧠 AI Features: Semantic analysis + context understanding")
+                print("📂 Email Clustering: Hybrid (Enhanced NLP + LLM)")
+                print("🚀 AI Features: Fast clustering + intelligent naming")
             else:
                 print("📂 Email Clustering: NLP-based (ML)")
                 print("🤖 ML Features: TF-IDF vectorization + adaptive clustering")
