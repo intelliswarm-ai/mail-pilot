@@ -14,7 +14,7 @@ from .voice_generator import VoiceGenerator
 from .scheduler import EmailSummaryScheduler, ManualRunner
 
 class MailPilotService:
-    def __init__(self, config_file: str = '.env'):
+    def __init__(self, config_file: str = '../.env'):
         self.config = load_config(config_file)
         self.gmail_client = None
         self.ollama_client = None
@@ -218,7 +218,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Mail Pilot - AI Email Summary Service')
-    parser.add_argument('--config', default='.env', help='Configuration file path')
+    parser.add_argument('--config', default='../.env', help='Configuration file path')
     parser.add_argument('--once', action='store_true', help='Run once instead of scheduling')
     parser.add_argument('--status', action='store_true', help='Show service status')
     

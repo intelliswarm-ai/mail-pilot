@@ -40,7 +40,7 @@ class AppConfig:
     log_level: str
 
 class ConfigManager:
-    def __init__(self, env_file: str = '.env'):
+    def __init__(self, env_file: str = '../.env'):
         self.env_file = env_file
         self._load_environment()
     
@@ -159,7 +159,7 @@ class ConfigManager:
         logging.info(f"Logging configured with level: {log_level}")
 
 
-def load_config(env_file: str = '.env') -> AppConfig:
+def load_config(env_file: str = '../.env') -> AppConfig:
     """Convenience function to load and validate configuration"""
     config_manager = ConfigManager(env_file)
     config = config_manager.get_config()

@@ -1,7 +1,10 @@
-# Environment variables
+# Environment variables (stored in parent directory)
 .env
 .env.local
 .env.*.local
+../.env
+../.env.local
+../.env.*.local
 
 # Gmail API credentials and tokens
 credentials.json

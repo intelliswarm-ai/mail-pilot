@@ -33,8 +33,8 @@ AI-powered email summary service that connects to your Gmail, analyzes unread me
 
 4. **Configure environment**:
    ```bash
-   cp .env.example .env
-   # Edit .env with your Gmail App Password and other settings
+   cp .env.example ../.env
+   # Edit ../.env with your Gmail App Password and other settings
    ```
 
 5. **Generate Gmail token** (first-time setup):
@@ -99,7 +99,7 @@ EMAIL_PASSWORD=your-app-password
 
 # Ollama settings  
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1
+OLLAMA_MODEL=mistral
 
 # Scheduling (hours)
 SUMMARY_INTERVAL=6
@@ -107,6 +107,8 @@ SUMMARY_INTERVAL=6
 # Voice features
 VOICE_ENABLED=true
 VOICE_LANGUAGE=en
+
+# Note: This file should be placed as ../.env (parent directory)
 ```
 
 ## Usage
@@ -186,7 +188,10 @@ When you first run the service, it will:
 parent-directory/
 ├── credentials.json    # Gmail API credentials
 ├── token.json         # OAuth token (auto-generated)
+├── .env               # Configuration file
 └── mail-pilot/        # Project directory
+    ├── .env.example   # Template for .env
+    └── ...
 ```
 
 ## Contributing

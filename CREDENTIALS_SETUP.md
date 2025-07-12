@@ -8,10 +8,11 @@ For security and privacy, Gmail credentials should be stored **one folder above*
 parent-directory/
 ├── credentials.json     ← Place Gmail API credentials here
 ├── token.json          ← Auto-generated OAuth token (after first run)
+├── .env                ← Configuration file (copied from .env.example)
 └── mail-pilot/         ← Project directory
     ├── src/
     ├── templates/
-    ├── .env
+    ├── .env.example    ← Template file
     └── ...
 ```
 
@@ -28,14 +29,30 @@ parent-directory/
 7. **Rename it to `credentials.json`**
 8. **Move it to the parent directory** (one folder above mail-pilot)
 
-### 2. Update Configuration
+### 2. Create Configuration File
 
-Your `.env` file should point to the parent directory:
+Copy the template to the parent directory and update it:
+
+```bash
+cp .env.example ../.env
+```
+
+Your `../.env` file should contain:
 
 ```env
 # Gmail API Configuration (stored in parent directory for privacy)
 GMAIL_CREDENTIALS_PATH=../credentials.json
 GMAIL_TOKEN_PATH=../token.json
+
+# Email Configuration
+EMAIL_ADDRESS=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+
+# Ollama Configuration
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=mistral
+
+# Other settings...
 ```
 
 ### 3. First Run Authentication
@@ -49,29 +66,31 @@ When you first run the service:
 
 ## Security Benefits
 
-**Why store credentials in parent directory:**
+**Why store sensitive files in parent directory:**
 
-✅ **Git Safety**: Credentials are outside the project repository  
+✅ **Git Safety**: All sensitive files are outside the project repository  
 ✅ **Accidental Commits**: Won't be included in version control  
-✅ **Deployment Separation**: Keeps secrets separate from code  
-✅ **Multi-Project Usage**: Can be shared across multiple mail-pilot instances  
+✅ **Deployment Separation**: Keeps secrets and config separate from code  
+✅ **Multi-Project Usage**: Can be shared across multiple instances  
+✅ **Environment Isolation**: Different .env files for dev/staging/prod  
 
 ## File Permissions (Recommended)
 
 Set restrictive permissions on credential files:
 
 ```bash
-# Make credentials readable only by owner
+# Make all sensitive files readable only by owner
 chmod 600 ../credentials.json
 chmod 600 ../token.json
+chmod 600 ../.env
 ```
 
 ## Troubleshooting
 
 **File not found errors:**
-- Verify `credentials.json` is in the parent directory
-- Check the path in your `.env` file
-- Ensure the file is named exactly `credentials.json`
+- Verify `credentials.json` and `.env` are in the parent directory
+- Check the paths in your `../.env` file
+- Ensure files are named exactly `credentials.json` and `.env`
 
 **Permission errors:**
 - Check file permissions

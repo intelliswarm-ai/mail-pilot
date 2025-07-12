@@ -31,13 +31,13 @@ pip install -r requirements.txt
 
 ### 3. Configure Environment Variables
 
-Copy `.env.example` to `.env` and fill in your values:
+Copy `.env.example` to the parent directory and fill in your values:
 
 ```bash
-cp .env.example .env
+cp .env.example ../.env
 ```
 
-Edit `.env` with your settings:
+Edit `../.env` with your settings:
 ```env
 # Gmail API Configuration (stored in parent directory for privacy)
 GMAIL_CREDENTIALS_PATH=../credentials.json
