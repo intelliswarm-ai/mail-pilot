@@ -1,16 +1,20 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from datetime import datetime
 from .gmail_client import GmailClient
 from .ollama_client import OllamaClient
 from .email_categorizer import EmailCategorizer
+from .email_nlp_categorizer import EmailNLPCategorizer
+from .email_enhanced_categorizer import EmailEnhancedCategorizer
 from tqdm import tqdm
 
 class EmailProcessor:
     def __init__(self, gmail_client: GmailClient, ollama_client: OllamaClient):
         self.gmail_client = gmail_client
         self.ollama_client = ollama_client
-        self.categorizer = EmailCategorizer()
+        self.categorizer = EmailCategorizer()  # Keep for fallback
+        self.nlp_categorizer = EmailNLPCategorizer()  # Legacy categorizer
+        self.enhanced_categorizer = EmailEnhancedCategorizer()  # Enhanced categorizer
     
     def process_unread_emails(self, query: str = 'is:unread', options: Dict = None) -> Dict[str, Any]:
         logging.info("Starting email processing...")
@@ -38,20 +42,36 @@ class EmailProcessor:
         
         # Categorize emails if requested
         if options.get('categorize_emails', False):
-            commercial_emails, personal_emails = self.categorizer.categorize_emails(unread_emails)
+            # Use enhanced TF-IDF + adaptive clustering for better categorization
+            try:
+                clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
+                print("✅ Using Enhanced Categorizer (TF-IDF + Adaptive Clustering)")
+            except Exception as e:
+                print(f"⚠️  Enhanced categorizer failed ({e}), falling back to NLP categorizer")
+                clustered_emails = self.nlp_categorizer.categorize_emails(unread_emails)
             
-            # Process commercial and personal emails separately
-            commercial_summaries = self._process_email_batch(commercial_emails, "Commercial", options)
-            personal_summaries = self._process_email_batch(personal_emails, "Personal", options)
+            # Process each cluster separately
+            all_summaries = []
+            cluster_summaries = {}
             
-            # Combine results
-            email_summaries = commercial_summaries + personal_summaries
+            for category_name, category_emails in clustered_emails.items():
+                category_summaries = self._process_email_batch(category_emails, category_name, options)
+                all_summaries.extend(category_summaries)
+                cluster_summaries[category_name] = category_summaries
             
-            # Generate separate overall summaries
-            commercial_overall = self.ollama_client.generate_overall_summary(commercial_summaries) if commercial_summaries else "No commercial emails."
-            personal_overall = self.ollama_client.generate_overall_summary(personal_summaries) if personal_summaries else "No personal emails."
+            email_summaries = all_summaries
             
-            overall_summary = f"COMMERCIAL EMAILS:\n{commercial_overall}\n\nPERSONAL EMAILS:\n{personal_overall}"
+            # Generate overall summary with cluster information
+            overall_parts = []
+            for category_name, category_summaries in cluster_summaries.items():
+                if category_summaries:
+                    category_overall = self.ollama_client.generate_overall_summary(category_summaries)
+                    overall_parts.append(f"{category_name.upper()}:\n{category_overall}")
+            
+            overall_summary = "\n\n".join(overall_parts) if overall_parts else "No emails found."
+            
+            # For backward compatibility, try to identify commercial/personal clusters
+            commercial_emails, personal_emails = self._map_clusters_to_legacy_categories(clustered_emails)
             
         else:
             # Process all emails together
@@ -68,8 +88,15 @@ class EmailProcessor:
         need_response = len([e for e in email_summaries if e['requires_response']])
         
         if options.get('categorize_emails', False):
-            print(f"   🏢 Commercial Emails: {len(commercial_emails)}")
-            print(f"   👤 Personal Emails: {len(personal_emails)}")
+            if isinstance(commercial_emails, list) and isinstance(personal_emails, list):
+                print(f"   🏢 Commercial Emails: {len(commercial_emails)}")
+                print(f"   👤 Personal Emails: {len(personal_emails)}")
+            else:
+                # Show cluster statistics instead
+                print(f"   📊 Email Clusters: {len(clustered_emails) if 'clustered_emails' in locals() else 'N/A'}")
+                if 'clustered_emails' in locals():
+                    for category_name, category_emails in clustered_emails.items():
+                        print(f"      📂 {category_name}: {len(category_emails)} emails")
         
         print(f"   📈 High Priority: {high_priority} emails")
         print(f"   📊 Medium Priority: {medium_priority} emails")
@@ -199,6 +226,32 @@ class EmailProcessor:
             print(f"   ⚠️  Need Response: {need_response} emails")
         
         return email_summaries
+    
+    def _map_clusters_to_legacy_categories(self, clustered_emails: Dict[str, List[Dict]]) -> Tuple[List[Dict], List[Dict]]:
+        """Map NLP clusters to legacy commercial/personal categories for backward compatibility"""
+        commercial_emails = []
+        personal_emails = []
+        
+        # Keywords that suggest commercial/marketing content
+        commercial_keywords = ['marketing', 'notification', 'newsletter', 'transactional', 'support', 'sale', 'offer']
+        personal_keywords = ['work', 'meeting', 'social', 'personal', 'friend']
+        
+        for category_name, category_emails in clustered_emails.items():
+            category_lower = category_name.lower()
+            
+            # Determine if this cluster is more commercial or personal
+            is_commercial = any(keyword in category_lower for keyword in commercial_keywords)
+            is_personal = any(keyword in category_lower for keyword in personal_keywords)
+            
+            if is_commercial and not is_personal:
+                commercial_emails.extend(category_emails)
+            elif is_personal and not is_commercial:
+                personal_emails.extend(category_emails)
+            else:
+                # Default unknown categories to commercial
+                commercial_emails.extend(category_emails)
+        
+        return commercial_emails, personal_emails
     
     def format_email_summary_text(self, processing_result: Dict[str, Any]) -> str:
         email_summaries = processing_result['email_summaries']

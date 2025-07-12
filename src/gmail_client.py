@@ -73,22 +73,42 @@ class GmailClient:
         try:
             print("📧 Connecting to Gmail...")
             logging.info(f"Fetching messages with query: {query}")
-            results = self.service.users().messages().list(
-                userId='me', q=query, maxResults=100
-            ).execute()
             
-            messages = results.get('messages', [])
-            print(f"📬 Found {len(messages)} unread messages")
-            logging.info(f"Found {len(messages)} unread messages to process")
+            # Get all messages with pagination
+            all_messages = []
+            next_page_token = None
+            page_count = 0
+            
+            while True:
+                page_count += 1
+                print(f"📄 Fetching page {page_count} of messages...")
+                
+                request_params = {'userId': 'me', 'q': query}
+                if next_page_token:
+                    request_params['pageToken'] = next_page_token
+                
+                results = self.service.users().messages().list(**request_params).execute()
+                
+                messages = results.get('messages', [])
+                all_messages.extend(messages)
+                
+                next_page_token = results.get('nextPageToken')
+                if not next_page_token:
+                    break
+                
+                print(f"   Found {len(messages)} messages on page {page_count}, continuing...")
+            
+            print(f"📬 Found {len(all_messages)} total messages across {page_count} pages")
+            logging.info(f"Found {len(all_messages)} messages to process across {page_count} pages")
             unread_emails = []
             
-            if len(messages) > 0:
+            if len(all_messages) > 0:
                 print("📥 Downloading email content...")
                 from tqdm import tqdm
                 
                 # Progress bar for email downloading
                 progress_bar = tqdm(
-                    messages, 
+                    all_messages, 
                     desc="📥 Downloading", 
                     unit="email",
                     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} emails [{elapsed}<{remaining}]'
@@ -156,7 +176,7 @@ class GmailClient:
                     payload['body']['data']
                 ).decode('utf-8')
         
-        return body[:1000]  # Reduced body length for faster processing
+        return body[:5000]  # Increased body length for better AI analysis
     
     def mark_as_read(self, message_id: str):
         try:

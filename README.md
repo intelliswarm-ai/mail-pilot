@@ -6,11 +6,16 @@ AI-powered email summary service that connects to your Gmail, analyzes unread me
 
 - **Gmail Integration**: Securely connects to your Gmail using OAuth2
 - **AI Summarization**: Uses Ollama with local LLMs to analyze and summarize emails
+- **Smart NLP Clustering**: Automatically categorizes emails using machine learning algorithms
+- **Intelligent Email Grouping**: Uses TF-IDF and K-means clustering to group similar emails
 - **Smart Prioritization**: Categorizes emails by priority (High/Medium/Low)
 - **Action Items Extraction**: Identifies tasks and follow-up items from emails
 - **Voice Summaries**: Generates audio summaries using text-to-speech
+- **Unlimited Email Processing**: Processes all available emails without artificial limits
+- **Enhanced Content Analysis**: Analyzes up to 5000 characters per email for better accuracy
+- **Interactive Menu System**: Choose timeframes and processing options interactively
 - **Configurable Scheduling**: Runs every 6-24 hours automatically
-- **Beautiful Email Reports**: Sends HTML and text summaries to your inbox
+- **Beautiful Email Reports**: Sends HTML and text summaries with category-specific reports
 - **Privacy Focused**: All processing happens locally with open-source models
 
 ## Quick Start
@@ -51,6 +56,9 @@ AI-powered email summary service that connects to your Gmail, analyzes unread me
    # Run once manually
    python main.py --once
    
+   # Run with interactive menu (recommended for first-time users)
+   python main.py --menu
+   
    # Run scheduled service (every 6 hours)
    python main.py
    
@@ -62,30 +70,37 @@ AI-powered email summary service that connects to your Gmail, analyzes unread me
 
 The service generates comprehensive email summaries including:
 
-- **Overview**: Total emails, high priority count, action items
+- **Smart Categorization**: Automatically groups emails into categories like "Marketing", "Notifications", "Work", etc.
+- **Category-Specific Reports**: Separate summaries for each email category
+- **Overview**: Total emails, high priority count, action items per category
 - **Individual Summaries**: AI-generated summary for each email
 - **Priority Classification**: High/Medium/Low priority assignments
 - **Action Items**: Extracted tasks and follow-ups
 - **Response Indicators**: Emails that require your response
 - **Voice Narration**: Audio file attached to summary emails
+- **Interactive Timeframes**: Process emails from last 12h, 24h, 48h, or all unread
 
 ## Project Structure
 
 ```
 mail-pilot/
 ├── src/
-│   ├── gmail_client.py       # Gmail API integration
-│   ├── ollama_client.py      # Ollama/LLM integration
-│   ├── email_processor.py    # Email analysis logic
-│   ├── email_sender.py       # SMTP email sending
-│   ├── voice_generator.py    # Text-to-speech
-│   ├── scheduler.py          # Scheduling system
-│   ├── config.py            # Configuration management
-│   └── mail_pilot_service.py # Main service orchestration
-├── main.py                   # Application entry point
-├── requirements.txt          # Python dependencies
-├── .env.example             # Environment template
-└── setup_instructions.md    # Detailed setup guide
+│   ├── gmail_client.py           # Gmail API integration with unlimited email support
+│   ├── ollama_client.py          # Ollama/LLM integration
+│   ├── email_processor.py        # Email analysis logic with NLP clustering
+│   ├── email_categorizer.py      # Legacy categorization (fallback)
+│   ├── email_nlp_categorizer.py  # Advanced NLP-based email clustering
+│   ├── email_menu.py             # Interactive menu system
+│   ├── email_sender.py           # SMTP email sending
+│   ├── voice_generator.py        # Text-to-speech
+│   ├── scheduler.py              # Scheduling system
+│   ├── file_saver.py            # Enhanced file saving with category support
+│   ├── config.py                # Configuration management
+│   └── mail_pilot_service.py     # Main service orchestration
+├── main.py                       # Application entry point
+├── requirements.txt              # Python dependencies (includes ML libraries)
+├── .env.example                 # Environment template
+└── setup_instructions.md        # Detailed setup guide
 ```
 
 ## Configuration
@@ -130,18 +145,49 @@ Then open your browser to `http://localhost:5000` and follow the setup wizard:
 ### Command Line Interface
 
 ```bash
-# Run email summary once
+# Run email summary once with automatic categorization
 python main.py --once
+
+# Run with interactive menu for timeframe and options selection
+python main.py --menu
 
 # Start scheduled service (runs every 6 hours by default)
 python main.py
 
-# Check service status
+# Check service status including Ollama connection
 python main.py --status
 
 # Use custom config file
 python main.py --config /path/to/.env
 ```
+
+### Interactive Menu Features
+
+When using `--menu`, you can select:
+
+1. **Timeframe Options**:
+   - Last 12 hours
+   - Last 24 hours  
+   - Last 48 hours
+   - Last 3 days
+   - Last 7 days
+   - All unread emails
+
+2. **Processing Options**:
+   - Enable/disable automatic email clustering
+   - Enable/disable voice summaries
+   - Choose summary detail level (brief/detailed)
+
+### NLP Clustering Features
+
+The advanced email categorization system:
+
+- Uses **TF-IDF vectorization** to extract email features
+- Applies **K-means clustering** to group similar emails
+- Automatically determines optimal number of categories (2-8)
+- Generates meaningful category labels like "Marketing", "Notifications", "Work", etc.
+- Creates separate reports for each category
+- Supports unlimited email processing without caps
 
 ## Privacy & Security
 
@@ -159,6 +205,8 @@ python main.py --config /path/to/.env
 - Gmail API credentials.json from Google Cloud Console
 - Gmail App Password generated (not your regular password)
 - Internet connection for Gmail API and voice generation
+- **New**: scikit-learn, NLTK, and numpy for NLP clustering features
+- **New**: Additional disk space for NLTK data downloads (punkt, stopwords, wordnet)
 
 ## Gmail Setup Details
 
@@ -194,15 +242,35 @@ parent-directory/
     └── ...
 ```
 
+## New in Latest Version
+
+### 🚀 Major Updates:
+
+- **NLP-Powered Email Clustering**: Replaces manual categorization with intelligent ML algorithms
+- **Unlimited Email Processing**: Removed 100-email limit, now processes all available emails
+- **Enhanced Content Analysis**: Increased email body analysis from 1000 to 5000 characters
+- **Interactive Menu System**: Choose processing timeframes and options interactively
+- **Advanced Category Reports**: Separate reports for each automatically detected category
+- **Better Performance**: Optimized for large email volumes with progress tracking
+
+### 🔬 Technical Improvements:
+
+- TF-IDF feature extraction for email content analysis
+- K-means clustering with automatic optimal cluster detection
+- NLTK integration for text preprocessing and tokenization
+- Smart category labeling based on email content patterns
+- Pagination support for Gmail API to handle large inboxes
+
 ## Contributing
 
 This project focuses on privacy-first email automation. Contributions welcome for:
 
 - Additional LLM integrations
-- Enhanced email parsing
-- Better summary formatting
+- Enhanced NLP clustering algorithms
+- Better email content preprocessing
 - Mobile notifications
-- Multi-language support
+- Multi-language support for clustering
+- Custom clustering models
 
 ## License
 

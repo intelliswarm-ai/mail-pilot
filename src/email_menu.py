@@ -55,17 +55,22 @@ class EmailMenu:
         # Email categorization
         print("📂 Email Categorization:")
         print("  1. Process all emails together")
-        print("  2. Separate commercial and personal emails")
+        print("  2. Use intelligent NLP clustering (recommended)")
+        print("      • Automatically groups similar emails")
+        print("      • Creates categories like Marketing, Notifications, Work, etc.")
+        print("      • Generates separate reports per category")
         print()
         
-        categorize = self._get_choice("Enable email categorization? (1-2): ", ['1', '2'])
+        categorize = self._get_choice("Select categorization method (1-2): ", ['1', '2'])
         categorize_emails = categorize == '2'
         
         if categorize_emails:
-            print("\n✅ Email categorization enabled")
-            print("   📊 Commercial emails will be processed separately from personal emails")
+            print("\n✅ NLP-based email clustering enabled")
+            print("   🤖 Emails will be automatically grouped using machine learning")
+            print("   📊 Separate reports will be generated for each detected category")
+            print("   🏷️  Categories are determined by email content similarity")
         else:
-            print("\n✅ Processing all emails together")
+            print("\n✅ Processing all emails together (no clustering)")
         
         # Voice generation
         print("\n🎵 Voice Summary:")
@@ -94,9 +99,11 @@ class EmailMenu:
         print("\n" + "="*60)
         print("📋 PROCESSING CONFIGURATION SUMMARY")
         print("="*60)
-        print(f"📂 Email Categorization: {'Enabled' if categorize_emails else 'Disabled'}")
+        print(f"📂 Email Clustering: {'NLP-based (ML)' if categorize_emails else 'Disabled (all together)'}")
         print(f"🎵 Voice Summaries: {'Enabled' if voice_enabled else 'Disabled'}")
         print(f"📝 Detail Level: {'Detailed' if detailed_summaries else 'Brief'}")
+        if categorize_emails:
+            print("🤖 ML Features: TF-IDF vectorization + K-means clustering")
         print("="*60)
         
         input("\nPress Enter to start processing...")
