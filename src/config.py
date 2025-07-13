@@ -63,9 +63,16 @@ class ConfigManager:
         )
         
         # Ollama configuration
+        ollama_url = self._get_env('OLLAMA_URL', 'http://localhost:11434')
+        ollama_model = self._get_env('OLLAMA_MODEL', 'mistral')
+        
+        # Debug output
+        logging.info(f"🤖 Ollama URL: {ollama_url}")
+        logging.info(f"🤖 Ollama Model: {ollama_model}")
+        
         ollama_config = OllamaConfig(
-            url=self._get_env('OLLAMA_URL', 'http://localhost:11434'),
-            model=self._get_env('OLLAMA_MODEL', 'llama3.1')
+            url=ollama_url,
+            model=ollama_model
         )
         
         # Email configuration

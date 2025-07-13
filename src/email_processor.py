@@ -59,6 +59,11 @@ class EmailProcessor:
             elif categorization_method == 'enhanced':
                 # Use enhanced TF-IDF + adaptive clustering
                 try:
+                    print(f"\n🚀 Starting Enhanced NLP Categorization for {len(unread_emails)} emails...")
+                    print("🔬 Using: TF-IDF vectorization + Adaptive clustering algorithms")
+                    print("📊 This will process each email individually for detailed analysis")
+                    print("=" * 80)
+                    
                     clustered_emails = self.enhanced_categorizer.categorize_emails(unread_emails)
                     print("✅ Using Enhanced Categorizer (TF-IDF + Adaptive Clustering)")
                 except Exception as e:

@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}Email Details - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-envelope-open"></i> Email Details
+            </h2>
+            <div>
+                <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                {% if email.requires_response %}
+                <button type="button" class="btn btn-primary" onclick="window.location.href='/reply-interface/{{ email.email_id }}'">
+                    <i class="fas fa-reply"></i> Reply
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Main Email Content -->
+    <div class="col-lg-8">
+        <!-- Email Header -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Email Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">Subject:</div>
+                    <div class="col-sm-9">
+                        <strong>{{ email.subject }}</strong>
+                        {% if email.priority %}
+                        <span class="badge bg-{{ 'danger' if email.priority == 'High' else 'warning' if email.priority == 'Medium' else 'success' }} ms-2">
+                            {{ email.priority }} Priority
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">From:</div>
+                    <div class="col-sm-9">{{ email.sender }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">Date:</div>
+                    <div class="col-sm-9">{{ email.original_content.date if email.original_content else 'N/A' }}</div>
+                </div>
+                
+                {% if email.category %}
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">Category:</div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-secondary category-badge">{{ email.category }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">Response Required:</div>
+                    <div class="col-sm-9">
+                        {% if email.requires_response %}
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-reply"></i> Yes
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check"></i> No
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if email.original_content and email.original_content.labels %}
+                <div class="row mb-3">
+                    <div class="col-sm-3 text-muted">Labels:</div>
+                    <div class="col-sm-9">
+                        {% for label in email.original_content.labels %}
+                        <span class="badge bg-light text-dark me-1">{{ label }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Email Content -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt"></i> Email Content
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="border rounded p-3" style="background-color: #f8f9fa; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif; max-height: 400px; overflow-y: auto;">{{ email.original_content.body if email.original_content else 'Email content not available' }}</div>
+            </div>
+        </div>
+
+        <!-- AI Analysis -->
+        {% if email.summary %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-robot"></i> AI Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    {{ email.summary }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Items -->
+        {% if email.action_items %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tasks"></i> Action Items
+                    <span class="badge bg-primary ms-2">{{ email.action_items|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if email.action_items_categorized %}
+                <!-- Categorized Action Items -->
+                {% for category, items in email.action_items_categorized.items() %}
+                {% if items %}
+                <div class="mb-3">
+                    <h6 class="text-{{ 'danger' if category == 'urgent' else 'warning' if category == 'deadline' else 'primary' if category == 'follow_up' else 'info' if category == 'information' else 'secondary' }}">
+                        {% if category == 'urgent' %}
+                        <i class="fas fa-exclamation-triangle"></i> Urgent
+                        {% elif category == 'deadline' %}
+                        <i class="fas fa-clock"></i> Deadline
+                        {% elif category == 'follow_up' %}
+                        <i class="fas fa-phone"></i> Follow Up
+                        {% elif category == 'information' %}
+                        <i class="fas fa-info-circle"></i> Information
+                        {% else %}
+                        <i class="fas fa-list"></i> Other
+                        {% endif %}
+                    </h6>
+                    <ul class="list-group list-group-flush">
+                        {% for item in items %}
+                        <li class="list-group-item action-item">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% else %}
+                <!-- Simple Action Items List -->
+                <ul class="list-group list-group-flush">
+                    {% for item in email.action_items %}
+                    <li class="list-group-item action-item">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Reply Preview -->
+        {% if email.suggested_reply %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-reply"></i> Suggested Reply
+                    {% if email.reply_confidence %}
+                    <span class="badge bg-light text-dark ms-2">
+                        Confidence: {{ email.reply_confidence }}%
+                    </span>
+                    {% endif %}
+                </h5>
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/reply-interface/{{ email.email_id }}'">
+                    <i class="fas fa-edit"></i> Edit Reply
+                </button>
+            </div>
+            <div class="card-body">
+                {% if email.reply_tone or email.reply_key_points %}
+                <div class="mb-3">
+                    {% if email.reply_tone %}
+                    <span class="text-muted">Tone: </span>
+                    <span class="badge bg-info me-2">{{ email.reply_tone|title }}</span>
+                    {% endif %}
+                    
+                    {% if email.reply_key_points %}
+                    <span class="text-muted">Key Points: </span>
+                    {% for point in email.reply_key_points %}
+                    <span class="badge bg-secondary me-1">{{ point }}</span>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div class="border rounded p-3" style="background-color: #f8f9fa; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">{{ email.suggested_reply }}</div>
+                
+                {% if email.reply_status %}
+                <div class="mt-3">
+                    <div class="alert alert-{{ 'success' if email.reply_status == 'sent' else 'info' if email.reply_status == 'approved' else 'secondary' }} mb-0">
+                        <i class="fas fa-{{ 'check-circle' if email.reply_status == 'sent' else 'check' if email.reply_status == 'approved' else 'clock' }}"></i>
+                        Status: {{ email.reply_status|title }}
+                        {% if email.reply_approved_at %}
+                        <br><small>Approved: {{ email.reply_approved_at }}</small>
+                        {% endif %}
+                        {% if email.reply_sent_at %}
+                        <br><small>Sent: {{ email.reply_sent_at }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if email.requires_response %}
+                    <button type="button" class="btn btn-primary" onclick="window.location.href='/reply-interface/{{ email.email_id }}'">
+                        <i class="fas fa-reply"></i> Create Reply
+                    </button>
+                    {% endif %}
+                    
+                    <button type="button" class="btn btn-outline-primary" onclick="copyEmailContent()">
+                        <i class="fas fa-copy"></i> Copy Email Content
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="exportEmailData()">
+                        <i class="fas fa-download"></i> Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Analysis -->
+        {% if email.phishing_risk_level %}
+        <div class="card mb-4 {{ 'phishing-alert' if email.phishing_risk_level in ['high', 'medium'] else '' }}">
+            <div class="card-header bg-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' if email.phishing_risk_level == 'medium' else 'info' if email.phishing_risk_level == 'low' else 'success' }} text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-shield-alt"></i> Security Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span>Phishing Risk Level:</span>
+                    <span class="badge bg-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' if email.phishing_risk_level == 'medium' else 'info' if email.phishing_risk_level == 'low' else 'success' }} fs-6">
+                        {{ email.phishing_risk_level|title }}
+                    </span>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span>Risk Score:</span>
+                    <span class="badge bg-{{ 'danger' if email.phishing_risk_score >= 80 else 'warning' if email.phishing_risk_score >= 50 else 'info' if email.phishing_risk_score >= 20 else 'success' }} fs-6">
+                        {{ email.phishing_risk_score }}%
+                    </span>
+                </div>
+                
+                {% if email.phishing_explanation %}
+                <div class="mb-3">
+                    <h6>Analysis Details:</h6>
+                    <div class="alert alert-light mb-0">
+                        {{ email.phishing_explanation }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if email.phishing_indicators %}
+                <div class="mb-3">
+                    <h6>Risk Indicators:</h6>
+                    <ul class="list-unstyled mb-0">
+                        {% for indicator in email.phishing_indicators %}
+                        <li class="mb-1">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            <small>{{ indicator }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if email.phishing_risk_level in ['high', 'medium'] %}
+                <div class="alert alert-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' }} mb-0">
+                    <small>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> Exercise caution with this email. 
+                        {% if email.phishing_risk_level == 'high' %}
+                        Do not click links or provide personal information.
+                        {% else %}
+                        Verify sender before taking any action.
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Email Metadata -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info"></i> Metadata
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-6 text-muted small">Email ID:</div>
+                    <div class="col-6 small">{{ email.email_id }}</div>
+                </div>
+                
+                {% if email.processing_time %}
+                <div class="row mb-2">
+                    <div class="col-6 text-muted small">Processed:</div>
+                    <div class="col-6 small">{{ email.processing_time }}</div>
+                </div>
+                {% endif %}
+                
+                {% if email.sentiment %}
+                <div class="row mb-2">
+                    <div class="col-6 text-muted small">Sentiment:</div>
+                    <div class="col-6 small">
+                        <span class="badge bg-{{ 'success' if email.sentiment == 'positive' else 'danger' if email.sentiment == 'negative' else 'secondary' }}">
+                            {{ email.sentiment|title }}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if email.confidence_score %}
+                <div class="row mb-2">
+                    <div class="col-6 text-muted small">AI Confidence:</div>
+                    <div class="col-6 small">{{ email.confidence_score }}%</div>
+                </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-6 text-muted small">Character Count:</div>
+                    <div class="col-6 small">{{ (email.original_content.body|length) if email.original_content else 'N/A' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyEmailContent() {
+    const emailContent = `Subject: {{ email.subject }}
+From: {{ email.sender }}
+Date: {{ email.original_content.date if email.original_content else 'N/A' }}
+
+{{ email.original_content.body if email.original_content else 'Email content not available' }}`;
+    
+    copyToClipboard(emailContent);
+}
+
+function exportEmailData() {
+    const emailData = {
+        id: '{{ email.email_id }}',
+        subject: '{{ email.subject }}',
+        sender: '{{ email.sender }}',
+        date: '{{ email.original_content.date if email.original_content else "N/A" }}',
+        category: '{{ email.category or "N/A" }}',
+        priority: '{{ email.priority or "N/A" }}',
+        requires_response: {{ 'true' if email.requires_response else 'false' }},
+        summary: '{{ email.summary or "N/A" }}',
+        action_items: {{ email.action_items|tojson if email.action_items else '[]' }},
+        phishing_risk: {
+            level: '{{ email.phishing_risk_level or "unknown" }}',
+            score: {{ email.phishing_risk_score or 0 }},
+            indicators: {{ email.phishing_indicators|tojson if email.phishing_indicators else '[]' }}
+        },
+        content: '{{ email.original_content.body if email.original_content else "N/A" }}'
+    };
+    
+    const blob = new Blob([JSON.stringify(emailData, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `email_${emailData.id}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('Email data exported successfully!', 'success');
+}
+</script>
+{% endblock %}

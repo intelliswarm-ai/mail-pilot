@@ -135,17 +135,41 @@ class EmailEnhancedCategorizer:
         processed_texts = []
         
         print("🔄 Creating enhanced text representations...")
-        for email in emails:
+        print("=" * 80)
+        
+        for i, email in enumerate(emails, 1):
+            # Show detailed processing for each email
+            subject = email.get('subject', 'No Subject')
+            sender = email.get('sender', 'Unknown Sender')
+            date = email.get('date', 'Unknown Date')
+            body_length = len(email.get('body', ''))
+            
+            print(f"\n📧 Processing Email {i}/{len(emails)}:")
+            print(f"   📤 From: {sender}")
+            print(f"   📝 Subject: {subject}")
+            print(f"   📅 Date: {date}")
+            print(f"   📏 Content length: {body_length} characters")
+            
             # Extract and clean different components
-            subject = self._clean_text(email.get('subject', ''))
-            body = self._clean_text(email.get('body', ''))
-            sender_info = self._extract_sender_features(email.get('sender', ''))
+            print(f"   🧹 Cleaning and extracting features...")
+            subject_clean = self._clean_text(subject)
+            body_clean = self._clean_text(email.get('body', ''))
+            sender_info = self._extract_sender_features(sender)
+            
+            print(f"   ✨ Features extracted:")
+            print(f"      📋 Subject keywords: {len(subject_clean.split())} words")
+            print(f"      📄 Body keywords: {len(body_clean.split())} words")
+            print(f"      👤 Sender features: {sender_info}")
             
             # Create weighted representation with enhanced features
             # Subject gets triple weight, body normal weight, sender features added
-            text_repr = f"{subject} {subject} {subject} {body} {sender_info}"
+            text_repr = f"{subject_clean} {subject_clean} {subject_clean} {body_clean} {sender_info}"
             processed_texts.append(text_repr)
+            
+            print(f"   ✅ Email {i} processed and ready for clustering")
         
+        print("\n" + "=" * 80)
+        print(f"🎯 All {len(emails)} emails processed for feature extraction!")
         return processed_texts
     
     def _clean_text(self, text: str) -> str:
@@ -640,11 +664,29 @@ class EmailEnhancedCategorizer:
         """Group emails by their assigned categories"""
         categorized_emails = {}
         
-        for email, cluster_id in zip(emails, cluster_assignments):
+        print("\n🏷️  Assigning emails to categories...")
+        print("=" * 80)
+        
+        for i, (email, cluster_id) in enumerate(zip(emails, cluster_assignments), 1):
             category_name = category_names.get(cluster_id, f"Cluster {cluster_id}")
+            
+            # Show detailed assignment for each email
+            subject = email.get('subject', 'No Subject')
+            sender = email.get('sender', 'Unknown Sender')
+            
+            print(f"\n📧 Email {i}/{len(emails)} Assignment:")
+            print(f"   📝 Subject: {subject[:60]}{'...' if len(subject) > 60 else ''}")
+            print(f"   📤 From: {sender}")
+            print(f"   🎯 Assigned to: '{category_name}'")
+            print(f"   🔢 Cluster ID: {cluster_id}")
+            if cluster_id == -1:
+                print(f"   ⚠️  Status: Outlier (doesn't fit well into any category)")
+            else:
+                print(f"   ✅ Status: Successfully categorized")
             
             if category_name not in categorized_emails:
                 categorized_emails[category_name] = []
+                print(f"   📁 Created new category: '{category_name}'")
             
             # Add metadata
             email_with_metadata = email.copy()
@@ -654,6 +696,8 @@ class EmailEnhancedCategorizer:
             
             categorized_emails[category_name].append(email_with_metadata)
         
+        print("\n" + "=" * 80)
+        print(f"🎉 All {len(emails)} emails successfully assigned to categories!")
         return categorized_emails
     
     def _print_categorization_summary(self, categorized_emails: Dict[str, List[Dict]]):

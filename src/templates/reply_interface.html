@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+
+{% block title %}Reply Interface - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-reply"></i> Reply Interface
+            </h2>
+            <div>
+                <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button type="button" class="btn btn-outline-primary" onclick="window.location.href='/email-details/{{ email.email_id }}'">
+                    <i class="fas fa-eye"></i> View Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row reply-interface">
+    <!-- Original Email Column -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-envelope-open"></i> Original Email
+                </h5>
+            </div>
+            <div class="card-body original-email">
+                <!-- Email Header -->
+                <div class="email-header">
+                    <div class="row mb-2">
+                        <div class="col-3 text-muted">Subject:</div>
+                        <div class="col-9">{{ email.subject }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-3 text-muted">From:</div>
+                        <div class="col-9">{{ email.sender }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-3 text-muted">Date:</div>
+                        <div class="col-9">{{ email.original_content.date if email.original_content else 'N/A' }}</div>
+                    </div>
+                    {% if email.category %}
+                    <div class="row mb-2">
+                        <div class="col-3 text-muted">Category:</div>
+                        <div class="col-9">
+                            <span class="badge bg-secondary">{{ email.category }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if email.priority %}
+                    <div class="row mb-2">
+                        <div class="col-3 text-muted">Priority:</div>
+                        <div class="col-9">
+                            <span class="badge bg-{{ 'danger' if email.priority == 'High' else 'warning' if email.priority == 'Medium' else 'success' }}">
+                                {{ email.priority }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Email Content -->
+                <div class="mb-3">
+                    <h6>Email Content:</h6>
+                    <div class="border rounded p-3" style="background-color: #f8f9fa; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">{{ email.original_content.body if email.original_content else 'Email content not available' }}</div>
+                </div>
+
+                <!-- Email Summary -->
+                {% if email.summary %}
+                <div class="mb-3">
+                    <h6>AI Summary:</h6>
+                    <div class="alert alert-info">
+                        {{ email.summary }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Action Items -->
+                {% if email.action_items %}
+                <div class="mb-3">
+                    <h6>Action Items:</h6>
+                    <ul class="list-group list-group-flush">
+                        {% for item in email.action_items %}
+                        <li class="list-group-item action-item">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Phishing Risk -->
+                {% if email.phishing_risk_level and email.phishing_risk_level != 'safe' %}
+                <div class="mb-3">
+                    <h6>Security Analysis:</h6>
+                    <div class="alert alert-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' if email.phishing_risk_level == 'medium' else 'info' }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="fas fa-shield-alt"></i> 
+                                Phishing Risk: {{ email.phishing_risk_level|title }}
+                            </span>
+                            <span class="badge bg-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' if email.phishing_risk_level == 'medium' else 'info' }}">
+                                {{ email.phishing_risk_score }}%
+                            </span>
+                        </div>
+                        {% if email.phishing_explanation %}
+                        <small class="text-muted d-block mt-2">{{ email.phishing_explanation }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply Draft Column -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-edit"></i> Suggested Reply
+                    {% if email.reply_confidence %}
+                    <span class="badge bg-light text-dark ms-2">
+                        Confidence: {{ email.reply_confidence }}%
+                    </span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body reply-draft">
+                <!-- Reply Metadata -->
+                {% if email.reply_tone or email.reply_key_points %}
+                <div class="mb-3">
+                    {% if email.reply_tone %}
+                    <div class="mb-2">
+                        <span class="text-muted">Tone: </span>
+                        <span class="badge bg-info">{{ email.reply_tone|title }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if email.reply_key_points %}
+                    <div class="mb-2">
+                        <span class="text-muted">Key Points: </span>
+                        {% for point in email.reply_key_points %}
+                        <span class="badge bg-secondary me-1">{{ point }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <hr>
+                {% endif %}
+
+                <!-- Editable Reply Text -->
+                <div class="mb-3">
+                    <label for="replyText" class="form-label">Reply Text:</label>
+                    <textarea 
+                        id="replyText" 
+                        class="form-control" 
+                        rows="15" 
+                        style="resize: vertical; font-family: 'Segoe UI', sans-serif;"
+                        placeholder="Loading suggested reply...">{{ email.suggested_reply or 'No reply suggestion available. Please compose your response.' }}</textarea>
+                </div>
+
+                <!-- Reply Statistics -->
+                <div class="row mb-3">
+                    <div class="col-4">
+                        <small class="text-muted">Characters: <span id="charCount">0</span></small>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Words: <span id="wordCount">0</span></small>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Lines: <span id="lineCount">0</span></small>
+                    </div>
+                </div>
+
+                <!-- Reply Suggestions -->
+                {% if email.reply_tone %}
+                <div class="mb-3">
+                    <h6>Suggestions for {{ email.reply_tone|title }} Tone:</h6>
+                    <div id="replySuggestions">
+                        <!-- Suggestions will be loaded here -->
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="d-grid gap-2">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary" id="saveReplyBtn">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                        <button type="button" class="btn btn-success" id="approveReplyBtn">
+                            <i class="fas fa-check"></i> Approve Reply
+                        </button>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-primary" id="copyReplyBtn">
+                            <i class="fas fa-copy"></i> Copy to Clipboard
+                        </button>
+                        <button type="button" class="btn btn-outline-success" id="sendReplyBtn" disabled>
+                            <i class="fas fa-paper-plane"></i> Send Reply
+                        </button>
+                    </div>
+                    
+                    <button type="button" class="btn btn-outline-secondary" id="regenerateReplyBtn">
+                        <i class="fas fa-sync-alt"></i> Regenerate Suggestion
+                    </button>
+                </div>
+
+                <!-- Reply Status -->
+                {% if email.reply_status %}
+                <div class="mt-3">
+                    <div class="alert alert-{{ 'success' if email.reply_status == 'sent' else 'info' if email.reply_status == 'approved' else 'secondary' }}">
+                        <i class="fas fa-{{ 'check-circle' if email.reply_status == 'sent' else 'check' if email.reply_status == 'approved' else 'clock' }}"></i>
+                        Status: {{ email.reply_status|title }}
+                        {% if email.reply_approved_at %}
+                        <br><small>Approved: {{ email.reply_approved_at }}</small>
+                        {% endif %}
+                        {% if email.reply_sent_at %}
+                        <br><small>Sent: {{ email.reply_sent_at }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reply Validation Modal -->
+<div class="modal fade" id="validationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Reply Validation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="validationResults"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="proceedAnywayBtn">Proceed Anyway</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const emailId = '{{ email.email_id }}';
+
+// Update reply statistics
+function updateReplyStats() {
+    const text = document.getElementById('replyText').value;
+    document.getElementById('charCount').textContent = text.length;
+    document.getElementById('wordCount').textContent = text.trim() ? text.trim().split(/\s+/).length : 0;
+    document.getElementById('lineCount').textContent = text.split('\n').length;
+}
+
+// Load reply suggestions
+async function loadReplySuggestions() {
+    const tone = '{{ email.reply_tone or "professional" }}';
+    const suggestions = {
+        'professional': [
+            "Consider adding specific timelines",
+            "Include relevant contact information", 
+            "Mention next steps clearly"
+        ],
+        'friendly': [
+            "Add a personal touch if appropriate",
+            "Use warmer language",
+            "Include enthusiasm where suitable"
+        ],
+        'formal': [
+            "Use formal language and structure",
+            "Include proper salutations",
+            "Be precise and concise"
+        ],
+        'helpful': [
+            "Offer additional assistance",
+            "Provide useful resources",
+            "Be proactive in addressing needs"
+        ]
+    };
+    
+    const container = document.getElementById('replySuggestions');
+    const toneSuggestions = suggestions[tone] || suggestions['professional'];
+    
+    container.innerHTML = toneSuggestions.map(suggestion => 
+        `<small class="d-block text-muted mb-1">• ${suggestion}</small>`
+    ).join('');
+}
+
+// Validate reply
+function validateReply(text) {
+    const issues = [];
+    let score = 100;
+    
+    // Check length
+    if (text.length < 20) {
+        issues.push("Reply is too short");
+        score -= 20;
+    } else if (text.length > 1000) {
+        issues.push("Reply is too long");
+        score -= 10;
+    }
+    
+    // Check for greeting
+    if (!/(hi|hello|dear|greetings)/i.test(text)) {
+        issues.push("Missing greeting");
+        score -= 15;
+    }
+    
+    // Check for closing
+    if (!/(regards|sincerely|thanks|best)/i.test(text)) {
+        issues.push("Missing professional closing");
+        score -= 15;
+    }
+    
+    // Check for placeholder text
+    if (/[\[\{]/.test(text)) {
+        issues.push("Contains placeholder text");
+        score -= 25;
+    }
+    
+    return {
+        is_valid: issues.length === 0,
+        score: Math.max(score, 0),
+        issues: issues
+    };
+}
+
+// Event listeners
+document.getElementById('replyText').addEventListener('input', updateReplyStats);
+
+document.getElementById('saveReplyBtn').addEventListener('click', async function() {
+    const replyText = document.getElementById('replyText').value;
+    
+    try {
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Saving...';
+        
+        await apiCall('/api/update-reply', {
+            method: 'POST',
+            body: JSON.stringify({
+                email_id: emailId,
+                reply_text: replyText
+            })
+        });
+        
+        showToast('Reply saved successfully!', 'success');
+        
+    } catch (error) {
+        showToast('Failed to save reply: ' + error.message, 'error');
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    }
+});
+
+document.getElementById('approveReplyBtn').addEventListener('click', async function() {
+    const replyText = document.getElementById('replyText').value;
+    const validation = validateReply(replyText);
+    
+    if (!validation.is_valid && validation.score < 60) {
+        // Show validation modal
+        const modal = new bootstrap.Modal(document.getElementById('validationModal'));
+        const resultsDiv = document.getElementById('validationResults');
+        
+        resultsDiv.innerHTML = `
+            <div class="alert alert-warning">
+                <h6>Reply Quality Score: ${validation.score}/100</h6>
+                <ul class="mb-0">
+                    ${validation.issues.map(issue => `<li>${issue}</li>`).join('')}
+                </ul>
+            </div>
+            <p>Do you want to proceed with approving this reply?</p>
+        `;
+        
+        modal.show();
+        return;
+    }
+    
+    await approveReply(false);
+});
+
+document.getElementById('proceedAnywayBtn').addEventListener('click', async function() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('validationModal'));
+    modal.hide();
+    await approveReply(false);
+});
+
+async function approveReply(sendImmediately = false) {
+    try {
+        const btn = document.getElementById('approveReplyBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Approving...';
+        
+        await apiCall('/api/approve-reply', {
+            method: 'POST',
+            body: JSON.stringify({
+                email_id: emailId,
+                send_immediately: sendImmediately
+            })
+        });
+        
+        showToast(sendImmediately ? 'Reply sent successfully!' : 'Reply approved successfully!', 'success');
+        
+        // Enable send button after approval
+        if (!sendImmediately) {
+            document.getElementById('sendReplyBtn').disabled = false;
+        }
+        
+        // Reload page to show updated status
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        showToast('Failed to approve reply: ' + error.message, 'error');
+    } finally {
+        const btn = document.getElementById('approveReplyBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Approve Reply';
+    }
+}
+
+document.getElementById('copyReplyBtn').addEventListener('click', function() {
+    const replyText = document.getElementById('replyText').value;
+    copyToClipboard(replyText);
+});
+
+document.getElementById('sendReplyBtn').addEventListener('click', async function() {
+    if (confirm('Are you sure you want to send this reply?')) {
+        await approveReply(true);
+    }
+});
+
+document.getElementById('regenerateReplyBtn').addEventListener('click', function() {
+    showToast('Reply regeneration not yet implemented', 'info');
+    // TODO: Implement reply regeneration
+});
+
+// Initialize
+updateReplyStats();
+loadReplySuggestions();
+</script>
+{% endblock %}

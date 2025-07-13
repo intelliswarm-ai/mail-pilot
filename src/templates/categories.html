@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Email Categories - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-tags"></i> Email Categories
+            </h2>
+            <div>
+                <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='/dashboard'">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </button>
+                <button type="button" class="btn btn-outline-primary" onclick="exportCategoriesData()">
+                    <i class="fas fa-download"></i> Export Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Statistics Overview -->
+{% if results.category_statistics %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Category Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for category, stats in results.category_statistics.items() %}
+                    <div class="col-md-6 col-lg-4 col-xl-3 mb-3">
+                        <div class="card h-100 border-start border-primary border-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">{{ category }}</h6>
+                                <div class="stats-number text-primary">{{ stats.total_emails }}</div>
+                                <small class="text-muted">emails</small>
+                                
+                                <div class="mt-2">
+                                    {% if stats.high_priority > 0 %}
+                                    <div class="badge bg-danger text-white mb-1">{{ stats.high_priority }} high priority</div>
+                                    {% endif %}
+                                    {% if stats.needs_response > 0 %}
+                                    <div class="badge bg-warning text-dark mb-1">{{ stats.needs_response }} need response</div>
+                                    {% endif %}
+                                    {% if stats.total_action_items > 0 %}
+                                    <div class="badge bg-info text-white mb-1">{{ stats.total_action_items }} action items</div>
+                                    {% endif %}
+                                    {% if stats.avg_phishing_risk > 20 %}
+                                    <div class="badge bg-{{ 'danger' if stats.avg_phishing_risk >= 60 else 'warning' }} text-white mb-1">
+                                        <i class="fas fa-shield-alt"></i> {{ stats.avg_phishing_risk|round }}% risk
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filter and Search -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="categoryFilter" class="form-label">Filter by Category:</label>
+                        <select class="form-select" id="categoryFilter">
+                            <option value="">All Categories</option>
+                            {% if results.category_statistics %}
+                            {% for category in results.category_statistics.keys() %}
+                            <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="priorityFilter" class="form-label">Filter by Priority:</label>
+                        <select class="form-select" id="priorityFilter">
+                            <option value="">All Priorities</option>
+                            <option value="High">High Priority</option>
+                            <option value="Medium">Medium Priority</option>
+                            <option value="Low">Low Priority</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="searchText" class="form-label">Search:</label>
+                        <input type="text" class="form-control" id="searchText" placeholder="Search emails...">
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="responseRequiredFilter">
+                            <label class="form-check-label" for="responseRequiredFilter">
+                                Response Required Only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="phishingRiskFilter">
+                            <label class="form-check-label" for="phishingRiskFilter">
+                                High Phishing Risk Only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Emails by Category -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list"></i> Emails by Category
+                </h5>
+                <div>
+                    <span class="text-muted" id="emailCount">
+                        {{ results.email_summaries|length if results.email_summaries else 0 }} emails
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if results.email_summaries %}
+                <div id="emailsList">
+                    {% for email in results.email_summaries %}
+                    <div class="email-item card mb-2 priority-{{ email.priority|lower if email.priority else 'low' }}" 
+                         data-category="{{ email.category or 'uncategorized' }}"
+                         data-priority="{{ email.priority or 'Low' }}"
+                         data-response-required="{{ 'true' if email.requires_response else 'false' }}"
+                         data-phishing-risk="{{ email.phishing_risk_level or 'safe' }}"
+                         data-search-content="{{ (email.subject + ' ' + email.sender + ' ' + (email.summary or ''))|lower }}">
+                        <div class="card-body py-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <h6 class="mb-0 me-2">{{ email.subject }}</h6>
+                                        
+                                        <!-- Category Badge -->
+                                        {% if email.category %}
+                                        <span class="badge bg-secondary category-badge me-1">{{ email.category }}</span>
+                                        {% endif %}
+                                        
+                                        <!-- Priority Badge -->
+                                        {% if email.priority %}
+                                        <span class="badge bg-{{ 'danger' if email.priority == 'High' else 'warning' if email.priority == 'Medium' else 'success' }} category-badge me-1">
+                                            {{ email.priority }}
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <!-- Response Required Badge -->
+                                        {% if email.requires_response %}
+                                        <span class="badge bg-info category-badge me-1">
+                                            <i class="fas fa-reply"></i> Reply
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <!-- Phishing Risk Badge -->
+                                        {% if email.phishing_risk_level and email.phishing_risk_level != 'safe' %}
+                                        <span class="badge bg-{{ 'danger' if email.phishing_risk_level == 'high' else 'warning' if email.phishing_risk_level == 'medium' else 'info' }} category-badge me-1">
+                                            <i class="fas fa-shield-alt"></i> {{ email.phishing_risk_level|title }} Risk
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-user"></i> {{ email.sender }} • 
+                                        <i class="fas fa-calendar"></i> {{ email.original_content.date if email.original_content else 'N/A' }}
+                                    </p>
+                                    
+                                    <p class="mb-2 email-preview">{{ email.summary or 'No summary available' }}</p>
+                                    
+                                    <!-- Action Items Preview -->
+                                    {% if email.action_items %}
+                                    <div class="mb-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-tasks"></i> {{ email.action_items|length }} action item(s):
+                                        </small>
+                                        <div class="ms-3">
+                                            {% for item in email.action_items[:2] %}
+                                            <div class="action-item small">{{ item }}</div>
+                                            {% endfor %}
+                                            {% if email.action_items|length > 2 %}
+                                            <small class="text-muted">... and {{ email.action_items|length - 2 }} more</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-4 text-end">
+                                    <!-- Phishing Risk Score -->
+                                    {% if email.phishing_risk_score is defined %}
+                                    <div class="mb-2">
+                                        <small class="text-muted">Phishing Risk:</small>
+                                        <div class="progress mb-1" style="height: 6px;">
+                                            <div class="progress-bar bg-{{ 'danger' if email.phishing_risk_score >= 80 else 'warning' if email.phishing_risk_score >= 50 else 'info' if email.phishing_risk_score >= 20 else 'success' }}" 
+                                                 style="width: {{ email.phishing_risk_score }}%"></div>
+                                        </div>
+                                        <small class="text-muted">{{ email.phishing_risk_score }}%</small>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="window.location.href='/email-details/{{ email.email_id }}'" 
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if email.requires_response %}
+                                        <button class="btn btn-outline-success" 
+                                                onclick="window.location.href='/reply-interface/{{ email.email_id }}'" 
+                                                title="Reply">
+                                            <i class="fas fa-reply"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-secondary" 
+                                                onclick="copyEmailSummary('{{ email.email_id }}')" 
+                                                title="Copy Summary">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No emails found</h4>
+                    <p class="text-muted">Try adjusting your filters or processing more emails.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Email data for filtering
+const emails = document.querySelectorAll('.email-item');
+let filteredCount = emails.length;
+
+// Filter functions
+function applyFilters() {
+    const categoryFilter = document.getElementById('categoryFilter').value.toLowerCase();
+    const priorityFilter = document.getElementById('priorityFilter').value;
+    const searchText = document.getElementById('searchText').value.toLowerCase();
+    const responseRequired = document.getElementById('responseRequiredFilter').checked;
+    const phishingRisk = document.getElementById('phishingRiskFilter').checked;
+    
+    let visibleCount = 0;
+    
+    emails.forEach(email => {
+        let show = true;
+        
+        // Category filter
+        if (categoryFilter && email.dataset.category.toLowerCase() !== categoryFilter) {
+            show = false;
+        }
+        
+        // Priority filter
+        if (priorityFilter && email.dataset.priority !== priorityFilter) {
+            show = false;
+        }
+        
+        // Search filter
+        if (searchText && !email.dataset.searchContent.includes(searchText)) {
+            show = false;
+        }
+        
+        // Response required filter
+        if (responseRequired && email.dataset.responseRequired !== 'true') {
+            show = false;
+        }
+        
+        // Phishing risk filter
+        if (phishingRisk && !['high', 'medium'].includes(email.dataset.phishingRisk)) {
+            show = false;
+        }
+        
+        email.style.display = show ? 'block' : 'none';
+        if (show) visibleCount++;
+    });
+    
+    // Update count
+    document.getElementById('emailCount').textContent = `${visibleCount} emails`;
+    filteredCount = visibleCount;
+}
+
+function clearFilters() {
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('priorityFilter').value = '';
+    document.getElementById('searchText').value = '';
+    document.getElementById('responseRequiredFilter').checked = false;
+    document.getElementById('phishingRiskFilter').checked = false;
+    applyFilters();
+}
+
+// Copy email summary
+function copyEmailSummary(emailId) {
+    const emailCard = document.querySelector(`[data-search-content*="${emailId}"]`);
+    if (emailCard) {
+        const subject = emailCard.querySelector('h6').textContent;
+        const sender = emailCard.querySelector('.text-muted').textContent;
+        const summary = emailCard.querySelector('.email-preview').textContent;
+        
+        const emailSummary = `Subject: ${subject}\nFrom: ${sender}\nSummary: ${summary}`;
+        copyToClipboard(emailSummary);
+    }
+}
+
+// Export categories data
+function exportCategoriesData() {
+    const visibleEmails = Array.from(emails).filter(email => email.style.display !== 'none');
+    const exportData = {
+        export_date: new Date().toISOString(),
+        total_emails: filteredCount,
+        category_statistics: {{ results.category_statistics|tojson if results.category_statistics else '{}' }},
+        emails: visibleEmails.map(email => {
+            const emailData = email.dataset;
+            return {
+                category: emailData.category,
+                priority: emailData.priority,
+                requires_response: emailData.responseRequired === 'true',
+                phishing_risk: emailData.phishingRisk,
+                subject: email.querySelector('h6').textContent,
+                sender: email.querySelector('.text-muted').textContent.split(' • ')[0].replace('👤 ', ''),
+                summary: email.querySelector('.email-preview').textContent
+            };
+        })
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `email_categories_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('Categories data exported successfully!', 'success');
+}
+
+// Event listeners
+document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+document.getElementById('priorityFilter').addEventListener('change', applyFilters);
+document.getElementById('searchText').addEventListener('input', applyFilters);
+document.getElementById('responseRequiredFilter').addEventListener('change', applyFilters);
+document.getElementById('phishingRiskFilter').addEventListener('change', applyFilters);
+
+// Initialize
+applyFilters();
+</script>
+{% endblock %}

@@ -1,0 +1,784 @@
+{% extends "base.html" %}
+
+{% block title %}Mail Pilot Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Control Panel -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog"></i> Email Processing Control
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="processingForm">
+                    <!-- Timeframe Selection -->
+                    <div class="mb-3">
+                        <label for="timeframeSelect" class="form-label">Timeframe</label>
+                        <select class="form-select" id="timeframeSelect" name="timeframe_hours">
+                            <option value="12">Last 12 hours</option>
+                            <option value="24" selected>Last 24 hours</option>
+                            <option value="48">Last 48 hours</option>
+                            <option value="72">Last 3 days</option>
+                            <option value="168">Last 7 days</option>
+                            <option value="0">All unread emails</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Categorization Method -->
+                    <div class="mb-3">
+                        <label class="form-label">Categorization Method</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="categorization_method" id="categoryNone" value="none">
+                            <label class="form-check-label" for="categoryNone">
+                                <strong>Process all together</strong><br>
+                                <small class="text-muted">No categorization, fastest processing</small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="categorization_method" id="categoryEnhanced" value="enhanced" checked>
+                            <label class="form-check-label" for="categoryEnhanced">
+                                <strong>Enhanced NLP Clustering</strong><br>
+                                <small class="text-muted">TF-IDF + adaptive clustering (recommended)</small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="categorization_method" id="categoryHybrid" value="llm">
+                            <label class="form-check-label" for="categoryHybrid">
+                                <strong>Hybrid AI Categorization</strong><br>
+                                <small class="text-muted">Fast clustering + LLM naming (best quality)</small>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Additional Features -->
+                    <div class="mb-3">
+                        <label class="form-label">Additional Features</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="phishingDetection" name="include_phishing_detection" checked>
+                            <label class="form-check-label" for="phishingDetection">
+                                <i class="fas fa-shield-alt text-danger"></i> Phishing Detection
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoReplies" name="include_auto_replies">
+                            <label class="form-check-label" for="autoReplies">
+                                <i class="fas fa-reply text-primary"></i> Auto-Reply Suggestions
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="startProcessing">
+                            <i class="fas fa-play"></i> Start Processing
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="triggerCLI">
+                            <i class="fas fa-terminal"></i> Run CLI Version
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="card mt-4" id="quickStats" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Quick Stats
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="stats-number text-primary" id="totalEmails">-</div>
+                        <div class="text-muted">Total Emails</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stats-number text-warning" id="highPriority">-</div>
+                        <div class="text-muted">High Priority</div>
+                    </div>
+                </div>
+                <div class="row text-center mt-3">
+                    <div class="col-6">
+                        <div class="stats-number text-danger" id="needsResponse">-</div>
+                        <div class="text-muted">Need Response</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stats-number text-success" id="totalCategories">-</div>
+                        <div class="text-muted">Categories</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Panel -->
+    <div class="col-lg-8">
+        <!-- Real-time Processing Panel -->
+        <div id="processingPanel" style="display: none;" class="mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cog fa-spin"></i> Real-time Processing
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Stage Progress -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span id="currentStage">Stage: Initializing</span>
+                            <span id="stageProgress">0%</span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div id="stageProgressBar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <small id="currentStep" class="text-muted">Preparing to start...</small>
+                    </div>
+                    
+                    <!-- Email Processing Stats -->
+                    <div class="row mb-3" id="emailStats" style="display: none;">
+                        <div class="col-3">
+                            <div class="text-center">
+                                <div class="stats-number text-primary" id="totalEmailsCount">0</div>
+                                <small class="text-muted">Total</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-center">
+                                <div class="stats-number text-success" id="processedEmailsCount">0</div>
+                                <small class="text-muted">Processed</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-center">
+                                <div class="stats-number text-warning" id="currentEmailIndex">0</div>
+                                <small class="text-muted">Current</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-center">
+                                <div class="stats-number text-info" id="remainingEmails">0</div>
+                                <small class="text-muted">Remaining</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Email Being Processed -->
+                    <div id="currentEmailCard" style="display: none;" class="card border-primary mb-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1" id="currentEmailSubject">Processing email...</h6>
+                                    <small class="text-muted" id="currentEmailSender">From: ...</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary" id="currentEmailStatus">Processing</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Email Progress List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-list"></i> Email Processing Progress
+                                <button class="btn btn-sm btn-outline-primary float-end" onclick="toggleEmailProgressList()">
+                                    <i class="fas fa-eye" id="toggleIcon"></i> Show All
+                                </button>
+                            </h6>
+                        </div>
+                        <div class="card-body" style="max-height: 300px; overflow-y: auto;" id="emailProgressList">
+                            <div class="text-center text-muted py-3">
+                                No emails being processed yet...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Processing Log Panel -->
+        <div id="processingLogPanel" style="display: none;" class="mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-terminal"></i> Processing Log
+                        <button class="btn btn-sm btn-outline-secondary float-end" onclick="clearProcessingLog()">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </h5>
+                </div>
+                <div class="card-body" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85em;" id="processingLog">
+                    <div class="text-muted">Log will appear here during processing...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="resultsContainer" style="display: none;">
+            <!-- Category Overview -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tags"></i> Email Categories
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/categories'">
+                        <i class="fas fa-external-link-alt"></i> Detailed View
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="categoryOverview" class="row">
+                        <!-- Categories will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- High Priority Emails -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle text-warning"></i> High Priority Emails
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="highPriorityEmails">
+                        <!-- High priority emails will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Phishing Alerts -->
+            <div class="card mb-4" id="phishingAlertsCard" style="display: none;">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-shield-alt"></i> Security Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="phishingAlerts">
+                        <!-- Phishing alerts will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock"></i> Recent Emails
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="recentEmails">
+                        <!-- Recent emails will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Welcome Message -->
+        <div id="welcomeMessage" class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-envelope-open-text fa-4x text-muted mb-4"></i>
+                <h3>Welcome to Mail Pilot</h3>
+                <p class="text-muted mb-4">
+                    Intelligent email management with AI-powered categorization, phishing detection, and auto-reply generation.
+                </p>
+                <p class="text-muted">
+                    Configure your processing options on the left and click "Start Processing" to begin.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pollInterval;
+let emailProgressListExpanded = false;
+
+// Enhanced processing status polling with real-time email updates
+function pollProcessingStatus() {
+    return setInterval(async () => {
+        try {
+            const status = await apiCall('/api/processing-status');
+            
+            if (status.is_running) {
+                showProcessingPanel();
+                updateProcessingDisplay(status);
+                updateEmailProgress(status);
+                updateProcessingLog(status);
+            } else {
+                hideProcessingPanel();
+                
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                
+                if (status.status === 'completed') {
+                    showToast('Email processing completed!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else if (status.status === 'error') {
+                    showToast('Processing failed: ' + status.error, 'error');
+                }
+                
+                // Re-enable the start button
+                document.getElementById('startProcessing').disabled = false;
+                document.getElementById('startProcessing').innerHTML = '<i class="fas fa-play"></i> Start Processing';
+            }
+        } catch (error) {
+            console.error('Status polling failed:', error);
+        }
+    }, 1000); // Poll every second for better real-time feel
+}
+
+function showProcessingPanel() {
+    document.getElementById('welcomeMessage').style.display = 'none';
+    document.getElementById('processingPanel').style.display = 'block';
+    document.getElementById('processingLogPanel').style.display = 'block';
+    document.getElementById('resultsContainer').style.display = 'none';
+}
+
+function hideProcessingPanel() {
+    document.getElementById('processingPanel').style.display = 'none';
+    document.getElementById('processingLogPanel').style.display = 'none';
+}
+
+function updateProcessingDisplay(status) {
+    // Update stage information
+    const stageNames = {
+        'fetching': 'Fetching Emails',
+        'categorizing': 'Categorizing Emails',
+        'analyzing': 'Security Analysis',
+        'generating_replies': 'Generating Replies',
+        'complete': 'Complete'
+    };
+    
+    document.getElementById('currentStage').textContent = `Stage: ${stageNames[status.stage] || status.stage}`;
+    document.getElementById('stageProgress').textContent = `${status.stage_progress || 0}%`;
+    document.getElementById('stageProgressBar').style.width = `${status.stage_progress || 0}%`;
+    document.getElementById('currentStep').textContent = status.current_step || 'Processing...';
+    
+    // Update overall progress
+    updateProgress(status.progress || 0, status.current_step || 'Processing...');
+    
+    // Update email statistics
+    if (status.total_emails > 0) {
+        document.getElementById('emailStats').style.display = 'block';
+        document.getElementById('totalEmailsCount').textContent = status.total_emails;
+        document.getElementById('processedEmailsCount').textContent = status.processed_emails || 0;
+        document.getElementById('currentEmailIndex').textContent = (status.processed_emails || 0) + 1;
+        document.getElementById('remainingEmails').textContent = status.total_emails - (status.processed_emails || 0);
+    }
+    
+    // Update current email being processed
+    if (status.current_email) {
+        document.getElementById('currentEmailCard').style.display = 'block';
+        document.getElementById('currentEmailSubject').textContent = status.current_email.subject;
+        document.getElementById('currentEmailSender').textContent = `From: ${status.current_email.sender}`;
+        
+        // Update status badge based on stage
+        const statusElement = document.getElementById('currentEmailStatus');
+        const stageColors = {
+            'fetching': 'bg-info',
+            'categorizing': 'bg-warning',
+            'analyzing': 'bg-danger',
+            'generating_replies': 'bg-success',
+            'complete': 'bg-success'
+        };
+        
+        statusElement.className = `badge ${stageColors[status.stage] || 'bg-primary'}`;
+        statusElement.textContent = stageNames[status.stage] || 'Processing';
+    }
+}
+
+function updateEmailProgress(status) {
+    const emailProgressList = document.getElementById('emailProgressList');
+    
+    if (!status.email_progress || status.email_progress.length === 0) {
+        return;
+    }
+    
+    // Clear existing content
+    emailProgressList.innerHTML = '';
+    
+    // Show only recent emails if not expanded, or all if expanded
+    const emailsToShow = emailProgressListExpanded ? status.email_progress : status.email_progress.slice(-5);
+    
+    emailsToShow.forEach(email => {
+        const emailDiv = document.createElement('div');
+        emailDiv.className = 'border-bottom pb-2 mb-2';
+        
+        const statusBadges = {
+            'pending': 'bg-secondary',
+            'categorizing': 'bg-warning',
+            'categorized': 'bg-info',
+            'analyzing_phishing': 'bg-danger',
+            'analyzed': 'bg-success',
+            'generating_reply': 'bg-primary',
+            'completed': 'bg-success',
+            'error': 'bg-danger'
+        };
+        
+        const statusTexts = {
+            'pending': 'Pending',
+            'categorizing': 'Categorizing',
+            'categorized': 'Categorized',
+            'analyzing_phishing': 'Security Analysis',
+            'analyzed': 'Security Complete',
+            'generating_reply': 'Generating Reply',
+            'completed': 'Complete',
+            'error': 'Error'
+        };
+        
+        emailDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1 small">${email.subject}</h6>
+                    <small class="text-muted">${email.sender}</small>
+                    ${email.details && email.details.phishing_risk ? `
+                        <span class="badge bg-${email.details.phishing_risk === 'high' ? 'danger' : email.details.phishing_risk === 'medium' ? 'warning' : 'info'} ms-2">
+                            ${email.details.phishing_risk} risk
+                        </span>
+                    ` : ''}
+                    ${email.details && email.details.reply_generated ? `
+                        <span class="badge bg-success ms-2">Reply Ready</span>
+                    ` : ''}
+                </div>
+                <div class="text-end">
+                    <span class="badge ${statusBadges[email.status] || 'bg-secondary'}">${statusTexts[email.status] || email.status}</span>
+                    <br><small class="text-muted">${formatTime(email.timestamp)}</small>
+                </div>
+            </div>
+        `;
+        
+        emailProgressList.appendChild(emailDiv);
+    });
+    
+    // Add "show more" indicator if not expanded and there are more emails
+    if (!emailProgressListExpanded && status.email_progress.length > 5) {
+        const moreDiv = document.createElement('div');
+        moreDiv.className = 'text-center text-muted py-2';
+        moreDiv.innerHTML = `<small>... and ${status.email_progress.length - 5} more emails</small>`;
+        emailProgressList.appendChild(moreDiv);
+    }
+    
+    // Auto-scroll to bottom
+    emailProgressList.scrollTop = emailProgressList.scrollHeight;
+}
+
+function updateProcessingLog(status) {
+    const logContainer = document.getElementById('processingLog');
+    
+    if (!status.detailed_log || status.detailed_log.length === 0) {
+        return;
+    }
+    
+    // Show only recent log entries (last 20)
+    const recentLogs = status.detailed_log.slice(-20);
+    
+    logContainer.innerHTML = recentLogs.map(log => {
+        const time = formatTime(log.timestamp);
+        const levelColors = {
+            'info': 'text-info',
+            'success': 'text-success',
+            'warning': 'text-warning',
+            'error': 'text-danger'
+        };
+        
+        return `<div class="mb-1">
+            <span class="text-muted">${time}</span> 
+            <span class="${levelColors[log.level] || 'text-muted'}">[${log.level.toUpperCase()}]</span> 
+            ${log.message}
+        </div>`;
+    }).join('');
+    
+    // Auto-scroll to bottom
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function toggleEmailProgressList() {
+    emailProgressListExpanded = !emailProgressListExpanded;
+    const toggleIcon = document.getElementById('toggleIcon');
+    
+    if (emailProgressListExpanded) {
+        toggleIcon.className = 'fas fa-eye-slash';
+        toggleIcon.parentElement.innerHTML = '<i class="fas fa-eye-slash"></i> Show Less';
+    } else {
+        toggleIcon.className = 'fas fa-eye';
+        toggleIcon.parentElement.innerHTML = '<i class="fas fa-eye"></i> Show All';
+    }
+}
+
+function clearProcessingLog() {
+    document.getElementById('processingLog').innerHTML = '<div class="text-muted">Log cleared</div>';
+}
+
+function formatTime(isoString) {
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString();
+    } catch (error) {
+        return 'Invalid time';
+    }
+}
+
+document.getElementById('processingForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = {
+        timeframe_hours: parseInt(formData.get('timeframe_hours')),
+        categorization_method: formData.get('categorization_method'),
+        include_phishing_detection: formData.get('include_phishing_detection') === 'on',
+        include_auto_replies: formData.get('include_auto_replies') === 'on'
+    };
+    
+    try {
+        document.getElementById('startProcessing').disabled = true;
+        document.getElementById('startProcessing').innerHTML = '<span class="loading-spinner"></span> Starting...';
+        
+        await apiCall('/api/trigger-processing', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        showToast('Email processing started!', 'success');
+        pollInterval = pollProcessingStatus();
+        
+    } catch (error) {
+        document.getElementById('startProcessing').disabled = false;
+        document.getElementById('startProcessing').innerHTML = '<i class="fas fa-play"></i> Start Processing';
+        showToast('Failed to start processing: ' + error.message, 'error');
+    }
+});
+
+document.getElementById('triggerCLI').addEventListener('click', async function() {
+    try {
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Running CLI...';
+        
+        const result = await apiCall('/api/trigger-cli', { method: 'POST' });
+        
+        if (result.return_code === 0) {
+            showToast('CLI execution completed successfully!', 'success');
+        } else {
+            showToast('CLI execution failed. Check logs for details.', 'error');
+        }
+        
+    } catch (error) {
+        showToast('Failed to trigger CLI: ' + error.message, 'error');
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-terminal"></i> Run CLI Version';
+    }
+});
+
+// Load results if available
+async function loadResults() {
+    try {
+        const results = await apiCall('/api/results');
+        displayResults(results);
+    } catch (error) {
+        // No results available yet
+        console.log('No results available');
+    }
+}
+
+function displayResults(results) {
+    document.getElementById('welcomeMessage').style.display = 'none';
+    document.getElementById('resultsContainer').style.display = 'block';
+    document.getElementById('quickStats').style.display = 'block';
+    
+    // Update quick stats
+    document.getElementById('totalEmails').textContent = results.total_emails || 0;
+    document.getElementById('highPriority').textContent = results.high_priority_count || 0;
+    document.getElementById('needsResponse').textContent = 
+        results.email_summaries?.filter(email => email.requires_response).length || 0;
+    document.getElementById('totalCategories').textContent = 
+        results.category_statistics ? Object.keys(results.category_statistics).length : 0;
+    
+    // Display categories
+    displayCategoryOverview(results);
+    
+    // Display high priority emails
+    displayHighPriorityEmails(results);
+    
+    // Display phishing alerts
+    displayPhishingAlerts(results);
+    
+    // Display recent emails
+    displayRecentEmails(results);
+}
+
+function displayCategoryOverview(results) {
+    const container = document.getElementById('categoryOverview');
+    container.innerHTML = '';
+    
+    if (results.category_statistics) {
+        Object.entries(results.category_statistics).forEach(([category, stats]) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4 mb-3';
+            
+            col.innerHTML = `
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">${category}</h6>
+                        <div class="stats-number text-primary">${stats.total_emails}</div>
+                        <small class="text-muted">emails</small>
+                        ${stats.high_priority > 0 ? `<div class="badge bg-warning text-dark mt-2">${stats.high_priority} high priority</div>` : ''}
+                        ${stats.needs_response > 0 ? `<div class="badge bg-danger mt-2">${stats.needs_response} need response</div>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(col);
+        });
+    }
+}
+
+function displayHighPriorityEmails(results) {
+    const container = document.getElementById('highPriorityEmails');
+    container.innerHTML = '';
+    
+    const highPriorityEmails = results.email_summaries?.filter(email => email.priority === 'High') || [];
+    
+    if (highPriorityEmails.length === 0) {
+        container.innerHTML = '<p class="text-muted">No high priority emails found.</p>';
+        return;
+    }
+    
+    highPriorityEmails.slice(0, 5).forEach(email => {
+        const emailDiv = document.createElement('div');
+        emailDiv.className = 'border-start border-danger border-3 ps-3 mb-3';
+        
+        emailDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">${email.subject}</h6>
+                    <p class="text-muted mb-1">From: ${email.sender}</p>
+                    <p class="mb-2 email-preview">${email.summary}</p>
+                    ${email.action_items?.length > 0 ? `
+                        <div class="mb-2">
+                            ${email.action_items.slice(0, 2).map(item => `<div class="action-item">${item}</div>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="ms-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/email-details/${email.email_id}'">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${email.requires_response ? `
+                        <button class="btn btn-sm btn-outline-success ms-1" onclick="window.location.href='/reply-interface/${email.email_id}'">
+                            <i class="fas fa-reply"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(emailDiv);
+    });
+}
+
+function displayPhishingAlerts(results) {
+    const container = document.getElementById('phishingAlerts');
+    const card = document.getElementById('phishingAlertsCard');
+    
+    const phishingEmails = results.email_summaries?.filter(email => 
+        email.phishing_risk_level === 'high' || email.phishing_risk_level === 'medium'
+    ) || [];
+    
+    if (phishingEmails.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+    
+    card.style.display = 'block';
+    container.innerHTML = '';
+    
+    phishingEmails.forEach(email => {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger d-flex justify-content-between align-items-center';
+        
+        const riskBadge = email.phishing_risk_level === 'high' ? 'bg-danger' : 'bg-warning text-dark';
+        
+        alertDiv.innerHTML = `
+            <div class="flex-grow-1">
+                <h6 class="alert-heading mb-1">${email.subject}</h6>
+                <p class="mb-1">From: ${email.sender}</p>
+                <p class="mb-2">${email.phishing_explanation || 'Suspicious email detected'}</p>
+                <span class="badge ${riskBadge}">Risk: ${email.phishing_risk_level} (${email.phishing_risk_score}%)</span>
+            </div>
+            <button class="btn btn-outline-danger btn-sm ms-3" onclick="window.location.href='/email-details/${email.email_id}'">
+                <i class="fas fa-shield-alt"></i> Details
+            </button>
+        `;
+        
+        container.appendChild(alertDiv);
+    });
+}
+
+function displayRecentEmails(results) {
+    const container = document.getElementById('recentEmails');
+    container.innerHTML = '';
+    
+    const recentEmails = results.email_summaries?.slice(0, 10) || [];
+    
+    if (recentEmails.length === 0) {
+        container.innerHTML = '<p class="text-muted">No emails found.</p>';
+        return;
+    }
+    
+    recentEmails.forEach(email => {
+        const emailDiv = document.createElement('div');
+        emailDiv.className = `card mb-2 priority-${email.priority?.toLowerCase()}`;
+        
+        const categoryBadge = email.category ? `<span class="badge bg-secondary category-badge">${email.category}</span>` : '';
+        const riskBadge = email.phishing_risk_level && email.phishing_risk_level !== 'safe' ? 
+            `<span class="badge bg-${email.phishing_risk_level === 'high' ? 'danger' : email.phishing_risk_level === 'medium' ? 'warning text-dark' : 'warning text-dark'} category-badge">
+                <i class="fas fa-shield-alt"></i> ${email.phishing_risk_level}
+            </span>` : '';
+        
+        emailDiv.innerHTML = `
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-1">
+                            <h6 class="mb-0 me-2">${email.subject}</h6>
+                            ${categoryBadge}
+                            ${riskBadge}
+                            ${email.requires_response ? '<span class="badge bg-info category-badge"><i class="fas fa-reply"></i> Reply needed</span>' : ''}
+                        </div>
+                        <p class="text-muted mb-1 small">From: ${email.sender}</p>
+                        <p class="mb-0 email-preview small">${email.summary}</p>
+                    </div>
+                    <div class="ms-3">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="window.location.href='/email-details/${email.email_id}'" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${email.requires_response ? `
+                                <button class="btn btn-outline-success" onclick="window.location.href='/reply-interface/${email.email_id}'" title="Reply">
+                                    <i class="fas fa-reply"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(emailDiv);
+    });
+}
+
+// Load results on page load
+loadResults();
+</script>
+{% endblock %}

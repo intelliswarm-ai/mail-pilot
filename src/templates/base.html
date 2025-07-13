@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mail Pilot - Intelligent Email Management{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom Mail Pilot CSS -->
+    <link href="{{ url_for('static', filename='css/mail-pilot.css') }}" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-blue: #2563eb;
+            --success-green: #059669;
+            --warning-orange: #d97706;
+            --danger-red: #dc2626;
+            --gray-100: #f3f4f6;
+            --gray-800: #1f2937;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--gray-100);
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            color: var(--primary-blue) !important;
+        }
+        
+        .card {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-blue);
+            border-color: var(--primary-blue);
+        }
+        
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        .risk-high { color: var(--danger-red); }
+        .risk-medium { color: var(--warning-orange); }
+        .risk-low { color: #fbbf24; }
+        .risk-safe { color: var(--success-green); }
+        
+        .priority-high { border-left: 4px solid var(--danger-red); }
+        .priority-medium { border-left: 4px solid var(--warning-orange); }
+        .priority-low { border-left: 4px solid var(--success-green); }
+        
+        .email-preview {
+            max-height: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .category-badge {
+            font-size: 0.8em;
+            padding: 0.3em 0.6em;
+        }
+        
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+            padding: 1rem;
+            display: none;
+        }
+        
+        .stats-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+        
+        .stats-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .reply-interface {
+            height: 70vh;
+        }
+        
+        .original-email, .reply-draft {
+            height: 100%;
+            overflow-y: auto;
+        }
+        
+        .email-header {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .action-item {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+        }
+        
+        .phishing-alert {
+            border: 2px solid var(--danger-red);
+            background-color: #fef2f2;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1060;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-envelope-open-text"></i> Mail Pilot
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a class="nav-link" href="{{ url_for('categories_view') }}">
+                    <i class="fas fa-tags"></i> Categories
+                </a>
+                <a class="nav-link" href="{{ url_for('status_page') }}">
+                    <i class="fas fa-heartbeat"></i> Status
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Progress Bar -->
+    <div id="progressContainer" class="progress-container">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <div class="progress">
+                        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small id="progressStatus" class="text-muted">Processing...</small>
+                </div>
+                <div class="col-4 text-end">
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container"></div>
+    
+    <!-- Main Content -->
+    <main class="container-fluid mt-4">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom Mail Pilot JavaScript -->
+    <script src="{{ url_for('static', filename='js/mail-pilot.js') }}"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Global functions for UI interactions
+        function showToast(message, type = 'info') {
+            const toastHtml = `
+                <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            const toastContainer = document.querySelector('.toast-container');
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            const toastElement = toastContainer.lastElementChild;
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            
+            // Remove from DOM after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+        
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+        }
+        
+        function hideProgress() {
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+        
+        function updateProgress(percent, status) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressPercent').textContent = percent + '%';
+            document.getElementById('progressStatus').textContent = status;
+        }
+        
+        function formatDateTime(isoString) {
+            return new Date(isoString).toLocaleString();
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied to clipboard!', 'success');
+            });
+        }
+        
+        // API helper functions
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                showToast('API call failed: ' + error.message, 'error');
+                throw error;
+            }
+        }
+        
+        // Polling function for processing status
+        function pollProcessingStatus() {
+            return setInterval(async () => {
+                try {
+                    const status = await apiCall('/api/processing-status');
+                    
+                    if (status.is_running) {
+                        showProgress();
+                        updateProgress(status.progress, status.current_step);
+                    } else {
+                        hideProgress();
+                        
+                        if (status.status === 'completed') {
+                            showToast('Email processing completed!', 'success');
+                            // Reload page to show results
+                            setTimeout(() => window.location.reload(), 1000);
+                            return 'completed';
+                        } else if (status.status === 'error') {
+                            showToast('Processing failed: ' + status.error, 'error');
+                            return 'error';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status polling failed:', error);
+                }
+            }, 2000);
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

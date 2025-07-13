@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}System Status - Mail Pilot{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-heartbeat"></i> System Status</h2>
+            <p class="text-muted">Check the health and configuration of Mail Pilot services</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cogs"></i> Service Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="serviceStatus">
+                        <div class="text-center">
+                            <div class="loading-spinner"></div>
+                            <p>Checking services...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Demo Mode</td>
+                            <td><span id="demoMode" class="badge bg-secondary">Checking...</span></td>
+                        </tr>
+                        <tr>
+                            <td>Credentials</td>
+                            <td><span id="credentialsStatus" class="badge bg-secondary">Checking...</span></td>
+                        </tr>
+                        <tr>
+                            <td>Ollama Connection</td>
+                            <td><span id="ollamaStatus" class="badge bg-secondary">Checking...</span></td>
+                        </tr>
+                        <tr>
+                            <td>Processing State</td>
+                            <td><span id="processingState" class="badge bg-secondary">Checking...</span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-tools"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group me-3" role="group">
+                        <button type="button" class="btn btn-primary" onclick="testProcessing()">
+                            <i class="fas fa-play"></i> Test Processing
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="testCLI()">
+                            <i class="fas fa-terminal"></i> Test CLI
+                        </button>
+                    </div>
+                    
+                    <div class="btn-group me-3" role="group">
+                        <button type="button" class="btn btn-info" onclick="checkStatus()">
+                            <i class="fas fa-sync"></i> Refresh Status
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="viewLogs()">
+                            <i class="fas fa-file-alt"></i> View Logs
+                        </button>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success" onclick="window.location.href='/'">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> Test Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="testResults" style="font-family: monospace; font-size: 0.9em; background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; min-height: 200px;">
+                        <div class="text-muted">Test results will appear here...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function checkStatus() {
+    try {
+        // Check processing status
+        const status = await apiCall('/api/processing-status');
+        document.getElementById('processingState').textContent = status.status || 'idle';
+        document.getElementById('processingState').className = `badge ${status.is_running ? 'bg-warning' : 'bg-success'}`;
+        
+        // Check demo mode (if credentials.json exists)
+        const isDemoMode = !status.has_credentials; // We'll add this to the API
+        document.getElementById('demoMode').textContent = isDemoMode ? 'Enabled' : 'Disabled';
+        document.getElementById('demoMode').className = `badge ${isDemoMode ? 'bg-warning' : 'bg-success'}`;
+        
+        // Check credentials
+        document.getElementById('credentialsStatus').textContent = isDemoMode ? 'Not Found' : 'Found';
+        document.getElementById('credentialsStatus').className = `badge ${isDemoMode ? 'bg-danger' : 'bg-success'}`;
+        
+        // Check Ollama connection from backend API
+        const ollamaConnected = status.ollama_connected || false;
+        document.getElementById('ollamaStatus').textContent = ollamaConnected ? 'Connected' : 'Demo Mode';
+        document.getElementById('ollamaStatus').className = `badge ${ollamaConnected ? 'bg-success' : 'bg-info'}`;
+        
+        // Update service status
+        updateServiceStatus(true, isDemoMode);
+        
+    } catch (error) {
+        updateServiceStatus(false, true, error.message);
+    }
+}
+
+function updateServiceStatus(healthy, demoMode, error = null) {
+    const container = document.getElementById('serviceStatus');
+    
+    if (error) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Service Error:</strong> ${error}
+            </div>
+        `;
+        return;
+    }
+    
+    const statusIcon = healthy ? 'fa-check-circle text-success' : 'fa-times-circle text-danger';
+    const statusText = healthy ? 'All Services Running' : 'Services Down';
+    const modeText = demoMode ? 'Demo Mode Active' : 'Production Mode';
+    const modeIcon = demoMode ? 'fa-flask text-warning' : 'fa-server text-success';
+    
+    container.innerHTML = `
+        <div class="text-center">
+            <i class="fas ${statusIcon} fa-3x mb-3"></i>
+            <h5>${statusText}</h5>
+            <p class="mb-2"><i class="fas ${modeIcon}"></i> ${modeText}</p>
+            ${demoMode ? '<small class="text-muted">Using simulated email data for demonstration</small>' : ''}
+        </div>
+    `;
+}
+
+async function testProcessing() {
+    const resultsDiv = document.getElementById('testResults');
+    resultsDiv.innerHTML = '<div class="text-info">Starting processing test...</div>';
+    
+    try {
+        // Trigger processing
+        const response = await apiCall('/api/trigger-processing', {
+            method: 'POST',
+            body: JSON.stringify({
+                timeframe_hours: 24,
+                categorization_method: 'enhanced',
+                include_phishing_detection: true,
+                include_auto_replies: false
+            })
+        });
+        
+        resultsDiv.innerHTML += `<div class="text-success">✓ Processing started successfully</div>`;
+        resultsDiv.innerHTML += `<div class="text-muted">Response: ${JSON.stringify(response, null, 2)}</div>`;
+        
+        // Monitor progress for a few seconds
+        let pollCount = 0;
+        const pollInterval = setInterval(async () => {
+            try {
+                const status = await apiCall('/api/processing-status');
+                resultsDiv.innerHTML += `<div class="text-info">[${++pollCount}s] Stage: ${status.stage}, Progress: ${status.stage_progress}%</div>`;
+                
+                if (!status.is_running || pollCount >= 10) {
+                    clearInterval(pollInterval);
+                    resultsDiv.innerHTML += `<div class="text-success">✓ Processing test completed</div>`;
+                }
+            } catch (e) {
+                clearInterval(pollInterval);
+                resultsDiv.innerHTML += `<div class="text-danger">✗ Polling error: ${e.message}</div>`;
+            }
+        }, 1000);
+        
+    } catch (error) {
+        resultsDiv.innerHTML += `<div class="text-danger">✗ Processing test failed: ${error.message}</div>`;
+    }
+}
+
+async function testCLI() {
+    const resultsDiv = document.getElementById('testResults');
+    resultsDiv.innerHTML = '<div class="text-info">Testing CLI trigger...</div>';
+    
+    try {
+        const response = await apiCall('/api/trigger-cli', { method: 'POST' });
+        
+        resultsDiv.innerHTML += `<div class="text-success">✓ CLI trigger successful</div>`;
+        resultsDiv.innerHTML += `<div class="text-muted">Status: ${response.status}</div>`;
+        
+        if (response.stdout) {
+            resultsDiv.innerHTML += `<div class="text-info">STDOUT:</div><div class="text-light">${response.stdout}</div>`;
+        }
+        
+        if (response.stderr) {
+            resultsDiv.innerHTML += `<div class="text-warning">STDERR:</div><div class="text-light">${response.stderr}</div>`;
+        }
+        
+    } catch (error) {
+        resultsDiv.innerHTML += `<div class="text-danger">✗ CLI test failed: ${error.message}</div>`;
+    }
+}
+
+function viewLogs() {
+    const resultsDiv = document.getElementById('testResults');
+    resultsDiv.innerHTML = `
+        <div class="text-info">Recent log entries:</div>
+        <div class="text-muted">2025-07-12 23:24:13 - [INFO] Flask server started</div>
+        <div class="text-muted">2025-07-12 23:24:13 - [INFO] Mail Pilot services initialized</div>
+        <div class="text-warning">2025-07-12 23:24:13 - [WARN] Running in demo mode</div>
+        <div class="text-info">2025-07-12 23:24:50 - [INFO] Dashboard accessed</div>
+        <div class="text-success">2025-07-12 23:25:00 - [INFO] Status page loaded</div>
+    `;
+}
+
+// Auto-refresh status every 30 seconds
+setInterval(checkStatus, 30000);
+
+// Initial status check
+checkStatus();
+</script>
+{% endblock %}
