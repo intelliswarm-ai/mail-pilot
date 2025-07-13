@@ -1,4 +1,4 @@
-"# Mail Pilot 📧🤖
+# Mail Pilot 📧🤖
 
 AI-powered email summary service that connects to your Gmail, analyzes unread messages using Ollama, and sends you intelligent summaries with voice narration.
 
