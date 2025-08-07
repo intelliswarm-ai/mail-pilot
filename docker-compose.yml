@@ -11,10 +11,11 @@ services:
       - PYTHONPATH=/app/src
       - OLLAMA_URL=http://ollama:11434
     volumes:
+      # Mount source code for hot reload
+      - .:/app
       # Mount configuration files
       - ../credentials.json:/app/credentials.json:ro
       - ../token.json:/app/token.json
-      - ../.env:/app/.env:ro
       # Mount data directories
       - ./logs:/app/logs
       - ./summaries:/app/summaries
@@ -26,8 +27,9 @@ services:
     command: ["python", "web_app.py"]
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.1.32
     container_name: mail-pilot-ollama
+    platform: linux/amd64
     ports:
       - "11434:11434"
     volumes:
