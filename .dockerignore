@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs and temporary files
+*.log
+logs/
+mail_pilot.log
+
+# Credentials and tokens (these should be mounted as volumes)
+credentials.json
+token.json
+../.env
+
+# Test files
+test_*.py
+*_test.py
+
+# Documentation
+*.md
+CREDENTIALS_SETUP.md
+README*.md
+WEBAPP_SETUP_GUIDE.md
+setup_instructions.md
+web_ui_instructions.md
+
+# Summaries (will be mounted as volume)
+summaries/
+
+# Node modules if any
+node_modules/
+
+# Pytest
+.pytest_cache/
+.coverage

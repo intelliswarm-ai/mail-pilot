@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mail-pilot:
+    build: .
+    container_name: mail-pilot-app
+    ports:
+      - "5000:5000"
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app/src
+      - OLLAMA_URL=http://ollama:11434
+    volumes:
+      # Mount configuration files
+      - ../credentials.json:/app/credentials.json:ro
+      - ../token.json:/app/token.json
+      - ../.env:/app/.env:ro
+      # Mount data directories
+      - ./logs:/app/logs
+      - ./summaries:/app/summaries
+    depends_on:
+      - ollama
+    networks:
+      - mail-pilot-network
+    restart: unless-stopped
+    command: ["python", "web_app.py"]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mail-pilot-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - mail-pilot-network
+    restart: unless-stopped
+    environment:
+      - OLLAMA_ORIGINS=*
+
+volumes:
+  ollama-data:
+
+networks:
+  mail-pilot-network:
+    driver: bridge
